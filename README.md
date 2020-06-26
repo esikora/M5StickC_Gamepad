@@ -7,7 +7,7 @@ Development environment used for this application:
 - PlatformIO IDE for VSCode
 
 System
-- Device: M5Stack M5StickC
+- Device: [M5StickC](https://docs.m5stack.com/#/en/core/m5stickc)
 - Platform: espressif32
 - Board: m5stick-c
 - Framework: arduino
