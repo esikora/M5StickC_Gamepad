@@ -1,3 +1,26 @@
+/**
+    M5StickC_GamepadApp:
+    This application has been developed to use an M5StickC device (ESP32)
+    as bluetooth gamepad input device. It reads a joystick position and
+    button status and provides these data via Bluetooth Low Energy (BLE)
+    using the Human Interface Device (HID) via GATT protocol.
+
+    Copyright (C) 2020 by Ernst Sikora
+    
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+    
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+    
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include <Arduino.h>
 #include <M5StickC.h>
 #include <Wire.h>
@@ -6,8 +29,12 @@
 #include "AXP192_BLEService.h"
 #include "M5StickC_PowerManagement.h"
 
-#define JOY_ADDR 0x52
+// I2C address of the joystick unit
+static const uint8_t kI2CjoystickUnitAddr = 0x52;
 
+static const uint8_t kI2CjoystickUnitNumBytes = 0x03;
+
+// Bluetooth icon in RGB565 format and 16x24 size
 static const uint16_t image_data_icon_bluetooth[384] = {
     0x0000, 0x0000, 0x0000, 0x0193, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x0193, 0x0000, 0x0000, 0x0000, 
     0x0000, 0x0000, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x0000, 0x0000, 
@@ -35,6 +62,7 @@ static const uint16_t image_data_icon_bluetooth[384] = {
     0x0000, 0x0000, 0x0000, 0x01d1, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x09f2, 0x01d1, 0x0000, 0x0000, 0x0000
 };
 
+// Type definition: Struct for image data
 typedef struct {
     const uint16_t *data;
     uint16_t width;
@@ -42,30 +70,64 @@ typedef struct {
     uint8_t dataSize;
 } tImage;
 
+// Struct with image data of the bluetooth icon
 static const tImage icon_bluetooth = { image_data_icon_bluetooth, 16, 24, 16 };
 
+// Object providing the gamepad service via BLE
 GamepadBLE gamepad;
 
+// Object providing power management information via BLE
 AXP192_BLEService axp192ble;
+
+// Object providing utility functions for accessing power management data
 M5StickC_PowerManagement axp192PowMan;
 
-uint8_t joyRawCenterX = 122; // @TODO determine dynamically, e.g. no user action for x seconds and value within specified range
-uint8_t joyRawCenterY = 122; // @TODO determine dynamically, e.g. no user action for x seconds and value within specified range
 
+/**
+ * The execution of the loop function is structured into cycles where each cycle comprises a fixed number of slots.
+ * The numner of the slot determines which sub functions are executed.
+ * Some sub functions are executed in every slot, others are executed e.g. only in the last slot of each cycle.
+ */
+
+// Number of slots in each cycle
+static const uint16_t kNumSlots = 20;
+
+// Number of the current slot of the current cycle
 uint16_t curSlotNr = 0;
-static const uint16_t numSlots = 20;
+
+// Nominal duration of each slot in microseconds. Time that is not used up in a slot is spent by calling the delay function.
 static const uint32_t slotTimeMicros = 50000;
 
+/**
+ * Statistical data the helps to analyse computation times of the loop function.
+ */
+
+// Start time of loop function in microseconds
 uint64_t timeStartMicros = 0;
+
+// End time of loop function in microseconds
 uint64_t timeEndMicros = 0;
+
+// Duration of loop function in microseconds
 uint32_t timeDeltaMicros = 0;
-uint32_t timeDeltaMaxMicros = 0;
+
+// Maximum duration of a slot within the current cycle
 uint32_t timeDeltaMaxInCycleMicros = 0;
 
+// Overall maximum duration of a slot throughout all cycles
+uint32_t timeDeltaMaxMicros = 0;
+
+
+// Buffer to store debug output for printing to Serial.
 char strOut[200];
 
+
+// BLE server object of this device
 BLEServer *pServer = nullptr;
 
+/**
+ * Initializes the BLE device and BLE server. 
+ */
 void setupBLE()
 {
     // Initialize bluetooth device
@@ -96,6 +158,10 @@ void setup()
     axp192ble.start(pServer);
 }
 
+/**
+ * Processes power management data.
+ * Among other things determines the battery level of the gamepad.
+ */
 void processAxp()
 {
     // Read and process AXP192 data
@@ -118,6 +184,9 @@ void processAxp()
     axp192ble.setVBusPresent( axp192PowMan.isVBusPresent() );
 }
 
+/**
+ * Prints the current date and time from the RTC (real time clock) to Serial.
+ */
 void printRtcTimestamp()
 {
     RTC_TimeTypeDef RTC_TimeStruct;
@@ -133,20 +202,28 @@ void printRtcTimestamp()
     Serial.print(strOut);
 }
 
-void loop()
+// Joystick center value for x-axis. The joystick unit provides values in a range of approx. 0..245
+uint8_t joyRawCenterX = 122; // @TODO determine dynamically, e.g. no user action for x seconds and value within specified range
+
+// Joystick center value for y-axis. The joystick unit provides values in a range of approx. 0..245
+uint8_t joyRawCenterY = 122; // @TODO determine dynamically, e.g. no user action for x seconds and value within specified range
+
+// Current x-position value of the joystick
+uint8_t joyRawX = 0;
+
+// Current y-position value of the joystick
+uint8_t joyRawY = 0;
+
+// Current button press state of the joystick
+uint8_t joyPressed = 0;
+
+void processGamepadControls()
 {
-    timeStartMicros = micros();
+    joyRawX = joyRawCenterX;
+    joyRawY = joyRawCenterY;
+    joyPressed = 0;
 
-    //Serial.println("[V][M5StickC_GamepadApp.cpp] loop(): >> loop");
-    //Serial.flush();
-
-    /* ----- Read gamepad controls and send to host ------ */
-
-    uint8_t joyRawX = joyRawCenterX;
-    uint8_t joyRawY = joyRawCenterY;
-    uint8_t joyPressed = 0;
-
-    Wire.requestFrom(JOY_ADDR, 3);
+    Wire.requestFrom(kI2CjoystickUnitAddr, kI2CjoystickUnitNumBytes);
 
     if (Wire.available()) {
         joyRawX = Wire.read();
@@ -169,6 +246,19 @@ void loop()
 
     //sprintf(logStr, "x: %d (raw: %d), y: %d (raw: %d), b: %d\n", joyScaledX, joyRawX, joyScaledY, joyRawY, joyPressed);
     //Serial.print(logStr);
+}
+
+void loop()
+{
+    timeStartMicros = micros();
+
+    //Serial.println("[V][M5StickC_GamepadApp.cpp] loop(): >> loop");
+    //Serial.flush();
+
+    /* ----- Read gamepad controls and send to host ------ */
+    
+    // Do every second slot
+    processGamepadControls();
 
     /* ----- Update display ----- */
 
@@ -186,6 +276,7 @@ void loop()
     // Do in slot 1 and 11
     if (curSlotNr % 10 == 1)
     {
+        // If there is a bluetooth connection show the bluetooth icon on the display
         if (gamepad.isConnected()) {
             
             uint16_t i = 0;
@@ -205,6 +296,8 @@ void loop()
         }
     }
 
+    /* ----- Update battery status ----- */
+
     // Do in slot 2
     if (curSlotNr % 20 == 3)
     {
@@ -212,9 +305,10 @@ void loop()
         processAxp();
     }
 
+    /* ----- Print statistics about computation time ----- */
     
     // Do in last slot of each cycle
-    if (curSlotNr == numSlots - 1)
+    if (curSlotNr == kNumSlots - 1)
     {
         sprintf(strOut, "Duration of loop execution in microseconds: %d (last), %d (max in cylce), %d (max overall)",
                 timeDeltaMicros,
@@ -230,7 +324,7 @@ void loop()
         timeDeltaMaxInCycleMicros = 0;
     }
 
-    curSlotNr = (curSlotNr + 1) % numSlots;
+    curSlotNr = (curSlotNr + 1) % kNumSlots;
 
     //Serial.println("[V][M5StickC_GamepadApp.cpp] loop(): << loop");
     //Serial.flush();
@@ -254,6 +348,7 @@ void loop()
         }
     }
 
+    // Print warning when slot time has been exceed
     if (timeDeltaMicros < slotTimeMicros) {
         delayMicroseconds(slotTimeMicros - timeDeltaMicros);
     }
