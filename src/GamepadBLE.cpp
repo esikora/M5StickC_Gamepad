@@ -126,7 +126,7 @@ void GamepadBLE::start(BLEServer* pServer) {
     pServer->setCallbacks(new ConnectionEventCallback(this));
 
     // Initialize battery level, range 0..100
-    pHIDdevice_->setBatteryLevel(50);
+    //pHIDdevice_->setBatteryLevel(50);
 
     // Retrieve battery level characteristic and store for later use
     pBatteryLevelCharacteristic_ = pHIDdevice_->batteryService()->getCharacteristic( BLEUUID((uint16_t) 0x2a19) );

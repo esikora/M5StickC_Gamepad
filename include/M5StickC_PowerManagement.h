@@ -2,6 +2,7 @@
 
 /**
  * Helper class to use the functions of the M5StickC AXP192 power management unit.
+ * Its main functionality is to learn the battery capacity and compute the current battery level.
  * 
  * Content of the AXP192 power status register (0x00), see:
  * https://github.com/ContextQuickie/TTGO-T-Beam/wiki/Register-00H:-Power-Status-Register
@@ -51,14 +52,14 @@ class M5StickC_PowerManagement {
         void readData();
 
         /**
-         * Processes the data read from the AXP192 unit in order to determine the battery level.
+         * Processes the data read from the AXP192 unit in order to determine the battery capacity.
          * 
          * Needs to be called periodically, e.g. every 1 s, for the other functions of this class to work correctly.
          */
-        void computeBatteryLevel();
+        void computeBatteryCapacity();
 
         /**
-         * Calls readData and computeBatteryLevel.
+         * Calls readData and computeBatteryCapacity.
          */
         void readAndProcessData();
 
@@ -88,11 +89,22 @@ class M5StickC_PowerManagement {
         }
 
         /**
+         * Returns the battery current.
+         * batCurrent = batChargeCurrent - batDischargeCurrent
+         * 
+         * @return Battery current [mA].
+         */
+        inline float getBatCurrent()
+        {
+            return batCurrent_;
+        }
+
+        /**
          * Returns the battery charge current.
          * 
          * @return Battery charge current [mA].
          */
-        inline float getChargeCurrent()
+        inline float getBatChargeCurrent()
         {
             return batChargeCurrent_;
         }
@@ -102,7 +114,7 @@ class M5StickC_PowerManagement {
          * 
          * @return Battery discharge current [mA].
          */
-        inline float getDischargeCurrent()
+        inline float getBatDischargeCurrent()
         {
             return batDischargeCurrent_;
         }
@@ -215,7 +227,14 @@ class M5StickC_PowerManagement {
             float batPerc = 0.0f;
 
             if ( (coulombData_ > 0) && (coulombCounterMax_ > 0) ) {
-                batPerc = coulombData_ / coulombCounterMax_ * 100;
+                if (coulombData_ > coulombCounterMax_)
+                {
+                    batPerc = 100.0f;
+                }
+                else
+                {
+                    batPerc = coulombData_ / coulombCounterMax_ * 100;
+                }
             }
 
             return batPerc;
@@ -253,6 +272,7 @@ class M5StickC_PowerManagement {
 
         float 	batVoltage_             = 0.0f;
         float 	batPower_               = 0.0f;
+        float   batCurrent_             = 0.0f;
         float 	batChargeCurrent_       = 0.0f;
         float   batDischargeCurrent_    = 0.0f;
         float 	coulombData_            = 0.0f;

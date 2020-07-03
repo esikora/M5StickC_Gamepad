@@ -178,7 +178,7 @@ void processAxp()
     // Update AXP192 BLE service data
     axp192ble.setBatVoltage( axp192PowMan.getBatVoltage() );
     axp192ble.setBatPower( axp192PowMan.getBatPower() );
-    axp192ble.setBatChargeCurrent( axp192PowMan.getChargeCurrent() );
+    axp192ble.setBatChargeCurrent( axp192PowMan.getBatChargeCurrent() );
     axp192ble.setCoulombData( axp192PowMan.getCoulombData() );
     axp192ble.setCurrentDirection( axp192PowMan.getCurrentDirection() );
     axp192ble.setACInPresent( axp192PowMan.isACInPresent() );
@@ -301,8 +301,8 @@ void loop()
 
     /* ----- Update battery status ----- */
 
-    // Do in slot 2
-    if (curSlotNr == 3)
+    // Do in slot 3 every 50 slots
+    if (curSlotNr % 50 == 3)
     {
         printRtcTimestamp();
         processAxp();

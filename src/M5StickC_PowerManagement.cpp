@@ -46,10 +46,10 @@ void M5StickC_PowerManagement::readData()
 {
     batVoltage_ = M5.Axp.GetBatVoltage();
     batPower_ = M5.Axp.GetBatPower();
+    
+    batCurrent_ = M5.Axp.GetBatCurrent();
     batChargeCurrent_ = M5.Axp.GetBatChargeCurrent();
-
-    float batCurrent = M5.Axp.GetBatCurrent();
-    batDischargeCurrent_ = batCurrent - batChargeCurrent_;
+    batDischargeCurrent_ = batCurrent_ - batChargeCurrent_;
 
     coulombData_ = M5.Axp.GetCoulombData();
 
@@ -66,11 +66,11 @@ void M5StickC_PowerManagement::readData()
 }
 
 /**
- * Processes the data read from the AXP192 unit in order to determine the battery level.
+ * Processes the data read from the AXP192 unit in order to determine the battery capacity.
  * 
  * Needs to be called periodically, e.g. every 1 s, for the other functions of this class to work correctly.
  */
-void M5StickC_PowerManagement::computeBatteryLevel()
+void M5StickC_PowerManagement::computeBatteryCapacity()
 {
     char strOut[150];
 
@@ -166,12 +166,12 @@ void M5StickC_PowerManagement::computeBatteryLevel()
 }
 
 /**
- * Calls readData and computeBatteryLevel.
+ * Calls readData and computeBatteryCapacity.
  */
 void M5StickC_PowerManagement::readAndProcessData()
 {
     readData();
-    computeBatteryLevel();
+    computeBatteryCapacity();
 }
 
 /**
@@ -270,8 +270,8 @@ void M5StickC_PowerManagement::restoreDefaultAxpStorage()
  */
 void M5StickC_PowerManagement::printStatusToString(char *strOut)
 {
-    sprintf(strOut, "VBat = %.3f V, PBat = %.3f mW, ICharge = %.3f mA, Coulomb = %.3f mAh, CoulombMax = %.3f mAh, vBusPresent = %d",
-    batVoltage_, batPower_, batChargeCurrent_, coulombData_, coulombCounterMax_, isVBusPresent());
+    sprintf(strOut, "vBat = %.3f V, pBat = %.3f mW, iBat = %.3f mA, iChrg = %.3f mA, iDischrg = %.3f mAh, clmb = %.3f mAh, clmbMax = %.3f mAh, vBusPres = %d",
+    batVoltage_, batPower_, batCurrent_, batChargeCurrent_, batDischargeCurrent_, coulombData_, coulombCounterMax_, isVBusPresent());
 }
 
 /**
