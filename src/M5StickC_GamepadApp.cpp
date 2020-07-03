@@ -26,13 +26,10 @@
 #include <Wire.h>
 
 #include "GamepadBLE.h"
+#include "M5StickC_GamepadIO.h"
+
 #include "AXP192_BLEService.h"
 #include "M5StickC_PowerManagement.h"
-
-// I2C address of the joystick unit
-static const uint8_t kI2CjoystickUnitAddr = 0x52;
-
-static const uint8_t kI2CjoystickUnitNumBytes = 0x03;
 
 // Bluetooth icon in RGB565 format and 16x24 size
 static const uint16_t image_data_icon_bluetooth[384] = {
@@ -74,10 +71,13 @@ typedef struct {
 static const tImage icon_bluetooth = { image_data_icon_bluetooth, 16, 24, 16 };
 
 // Object providing the gamepad service via BLE
-GamepadBLE gamepad;
+GamepadBLE gamepadBle;
+
+// Object providing convenient access to gamepad peripherals
+M5StickC_GamepadIO *pGamepadIO = nullptr;
 
 // Object providing power management information via BLE
-AXP192_BLEService axp192ble;
+AXP192_BLEService axp192Ble;
 
 // Object providing utility functions for accessing power management data
 M5StickC_PowerManagement axp192PowMan;
@@ -96,7 +96,7 @@ static const uint16_t kNumSlots = 200;
 uint16_t curSlotNr = 0;
 
 // Nominal duration of each slot in microseconds. Time that is not used up in a slot is spent by calling the delay function.
-static const uint32_t slotTimeMicros = 50000;
+static const uint32_t slotTimeMicros = 25000;
 
 /**
  * Statistical data the helps to analyse computation times of the loop function.
@@ -145,17 +145,17 @@ void setup()
 
     axp192PowMan.start();
 
+    pGamepadIO = M5StickC_GamepadIO::getInstance();
+    pGamepadIO->start();
+
     M5.Lcd.setTextFont(4);
     M5.Lcd.setCursor(70, 0, 4);
     M5.Lcd.println(("Joy"));
 
-    // Setup I2C communiation for JoyC (grove port)
-    Wire.begin(32, 33, 400000);
-
     setupBLE();
 
-    gamepad.start(pServer);
-    axp192ble.start(pServer);
+    gamepadBle.start(pServer);
+    axp192Ble.start(pServer);
 }
 
 /**
@@ -173,18 +173,18 @@ void processAxp()
 
     // Set battery level of gamepad
     uint8_t batLvlPerc = (uint8_t) axp192PowMan.getBatteryLevelPercent();
-    gamepad.updateBatteryLevel(batLvlPerc);
+    gamepadBle.updateBatteryLevel(batLvlPerc);
 
     // Update AXP192 BLE service data
-    axp192ble.setBatVoltage( axp192PowMan.getBatVoltage() );
-    axp192ble.setBatPower( axp192PowMan.getBatPower() );
-    axp192ble.setBatChargeCurrent( axp192PowMan.getBatChargeCurrent() );
-    axp192ble.setCoulombData( axp192PowMan.getCoulombData() );
-    axp192ble.setCurrentDirection( axp192PowMan.getCurrentDirection() );
-    axp192ble.setACInPresent( axp192PowMan.isACInPresent() );
-    axp192ble.setACInAvailable( axp192PowMan.isACInPresent() );
-    axp192ble.setVBusPresent( axp192PowMan.isVBusPresent() );
-    axp192ble.setVBusAvailable( axp192PowMan.isVBusAvailable() );
+    axp192Ble.setBatVoltage( axp192PowMan.getBatVoltage() );
+    axp192Ble.setBatPower( axp192PowMan.getBatPower() );
+    axp192Ble.setBatChargeCurrent( axp192PowMan.getBatChargeCurrent() );
+    axp192Ble.setCoulombData( axp192PowMan.getCoulombData() );
+    axp192Ble.setCurrentDirection( axp192PowMan.getCurrentDirection() );
+    axp192Ble.setACInPresent( axp192PowMan.isACInPresent() );
+    axp192Ble.setACInAvailable( axp192PowMan.isACInPresent() );
+    axp192Ble.setVBusPresent( axp192PowMan.isVBusPresent() );
+    axp192Ble.setVBusAvailable( axp192PowMan.isVBusAvailable() );
 }
 
 /**
@@ -205,50 +205,26 @@ void printRtcTimestamp()
     Serial.print(strOut);
 }
 
-// Joystick center value for x-axis. The joystick unit provides values in a range of approx. 0..245
-uint8_t joyRawCenterX = 122; // @TODO determine dynamically, e.g. no user action for x seconds and value within specified range
-
-// Joystick center value for y-axis. The joystick unit provides values in a range of approx. 0..245
-uint8_t joyRawCenterY = 122; // @TODO determine dynamically, e.g. no user action for x seconds and value within specified range
-
-// Current x-position value of the joystick
-uint8_t joyRawX = 0;
-
-// Current y-position value of the joystick
-uint8_t joyRawY = 0;
-
-// Current button press state of the joystick
-uint8_t joyPressed = 0;
-
 void processGamepadControls()
 {
-    joyRawX = joyRawCenterX;
-    joyRawY = joyRawCenterY;
-    joyPressed = 0;
+    pGamepadIO->process();
 
-    Wire.requestFrom(kI2CjoystickUnitAddr, kI2CjoystickUnitNumBytes);
+    // Transform positions to output range
+    GamepadBLE::StickAxis_t joyScaledX = pGamepadIO->getJoyNormX() << 8;
+    GamepadBLE::StickAxis_t joyScaledY = pGamepadIO->getJoyNormY() << 8;
 
-    if (Wire.available()) {
-        joyRawX = Wire.read();
-        joyRawY = Wire.read();
-        joyPressed = Wire.read();
-    }
+    // Set left stick axis values
+    gamepadBle.setLeftStick(joyScaledX, joyScaledY);
 
-    //StickAxis_t joyScaledX = joyRawX << 8;
-    //StickAxis_t joyScaledY = joyRawY << 8;
+    // Set stick button state
+    gamepadBle.setLeftStickButton( pGamepadIO->isJoyPressed() );
 
-    GamepadBLE::StickAxis_t joyScaledX = (joyRawX - joyRawCenterX) << 8;
-    GamepadBLE::StickAxis_t joyScaledY = (joyRawY - joyRawCenterY) << 8;
+    // Set A and B button
+    gamepadBle.setButtonA( pGamepadIO->isBtnBluePressed() );
+    gamepadBle.setButtonB( pGamepadIO->isBtnRedPressed() );
 
-    //GamepadBLE::StickAxis_t joyScaledX = (joyRawX - joyRawCenterX);
-    //GamepadBLE::StickAxis_t joyScaledY = (joyRawY - joyRawCenterY);
-
-    gamepad.setLeftStick(joyScaledX, joyScaledY);
-    gamepad.setButtonA(joyPressed);
-    gamepad.updateInputReport();
-
-    //sprintf(logStr, "x: %d (raw: %d), y: %d (raw: %d), b: %d\n", joyScaledX, joyRawX, joyScaledY, joyRawY, joyPressed);
-    //Serial.print(logStr);
+    // Send data to host device
+    gamepadBle.updateInputReport();
 }
 
 void loop()
@@ -269,18 +245,18 @@ void loop()
     if (curSlotNr % 2 == 0)
     {
         M5.Lcd.setCursor(100, 50, 4);
-        M5.Lcd.printf("X:%d      ", joyRawX - joyRawCenterX);
+        M5.Lcd.printf("X:%d      ", pGamepadIO->getJoyNormX());
         M5.Lcd.setCursor(100, 80, 4);
-        M5.Lcd.printf("Y:%d      ", joyRawY - joyRawCenterY);
+        M5.Lcd.printf("Y:%d      ", pGamepadIO->getJoyNormY());
         M5.Lcd.setCursor(100, 110, 4);
-        M5.Lcd.printf("B:%d      ", joyPressed);
+        M5.Lcd.printf("%d%d%d", pGamepadIO->isJoyPressed(), pGamepadIO->isBtnBluePressed(), pGamepadIO->isBtnRedPressed());
     }
 
-    // Do in slot 1, 11 etc.
-    if (curSlotNr % 10 == 1)
+    // Do in slot 1, 21 etc.
+    if (curSlotNr % 20 == 1)
     {
         // If there is a bluetooth connection show the bluetooth icon on the display
-        if (gamepad.isConnected()) {
+        if (gamepadBle.isConnected()) {
             
             uint16_t i = 0;
 
@@ -301,8 +277,8 @@ void loop()
 
     /* ----- Update battery status ----- */
 
-    // Do in slot 3 every 50 slots
-    if (curSlotNr % 50 == 3)
+    // Do in slot 3 every 100 slots
+    if (curSlotNr % 100 == 3)
     {
         printRtcTimestamp();
         processAxp();
