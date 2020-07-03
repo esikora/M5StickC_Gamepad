@@ -8,10 +8,6 @@ GamepadBLE::GamepadBLE()
 {
 }
 
-void GamepadBLE::setBatteryLevel(uint8_t level) {
-    pHIDdevice_->setBatteryLevel(level);
-}
-
 void GamepadBLE::setButtonA(bool state) {
     gamepadData_.btn01 = state; // Default mapping
 }
@@ -132,6 +128,12 @@ void GamepadBLE::start(BLEServer* pServer) {
     // Initialize battery level, range 0..100
     pHIDdevice_->setBatteryLevel(50);
 
+    // Retrieve battery level characteristic and store for later use
+    pBatteryLevelCharacteristic_ = pHIDdevice_->batteryService()->getCharacteristic( BLEUUID((uint16_t) 0x2a19) );
+
+    // Enable server-initiated notifications for the "battery level" characteristic
+    ((BLE2902*) pBatteryLevelCharacteristic_->getDescriptorByUUID(BLEUUID((uint16_t) 0x2902)))->setNotifications(true);
+
     // Start the service
     pHIDdevice_->startServices();
 
@@ -151,9 +153,9 @@ void GamepadBLE::start(BLEServer* pServer) {
     Serial.flush();
 };
 
-void GamepadBLE::updateBLEdata() {
+void GamepadBLE::updateInputReport() {
 
-    //Serial.println("[V][GamepadBLE.cpp] updateBLEdata(): >> updateBLEdata");
+    //Serial.println("[V][GamepadBLE.cpp] updateInputReport(): >> updateInputReport");
     //Serial.flush();
 
     if (connected_)
@@ -175,8 +177,18 @@ void GamepadBLE::updateBLEdata() {
         Serial.flush();
     }
 
-    //Serial.println("[V][GamepadBLE.cpp] updateBLEdata(): << updateBLEdata");
+    //Serial.println("[V][GamepadBLE.cpp] updateInputReport(): << updateInputReport");
     //Serial.flush();
+}
+
+void GamepadBLE::updateBatteryLevel(uint8_t level) {
+    //pHIDdevice_->setBatteryLevel(level);
+
+    if (connected_)
+    {
+        pBatteryLevelCharacteristic_->setValue(&level, 1);
+        pBatteryLevelCharacteristic_->notify();
+    }
 }
 
 bool GamepadBLE::isConnected()

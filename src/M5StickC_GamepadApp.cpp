@@ -90,7 +90,7 @@ M5StickC_PowerManagement axp192PowMan;
  */
 
 // Number of slots in each cycle
-static const uint16_t kNumSlots = 20;
+static const uint16_t kNumSlots = 200;
 
 // Number of the current slot of the current cycle
 uint16_t curSlotNr = 0;
@@ -172,7 +172,8 @@ void processAxp()
     Serial.println(strOut);
 
     // Set battery level of gamepad
-    gamepad.setBatteryLevel( (uint8_t) axp192PowMan.getBatteryLevelPercent() );
+    uint8_t batLvlPerc = (uint8_t) axp192PowMan.getBatteryLevelPercent();
+    gamepad.updateBatteryLevel(batLvlPerc);
 
     // Update AXP192 BLE service data
     axp192ble.setBatVoltage( axp192PowMan.getBatVoltage() );
@@ -181,7 +182,9 @@ void processAxp()
     axp192ble.setCoulombData( axp192PowMan.getCoulombData() );
     axp192ble.setCurrentDirection( axp192PowMan.getCurrentDirection() );
     axp192ble.setACInPresent( axp192PowMan.isACInPresent() );
+    axp192ble.setACInAvailable( axp192PowMan.isACInPresent() );
     axp192ble.setVBusPresent( axp192PowMan.isVBusPresent() );
+    axp192ble.setVBusAvailable( axp192PowMan.isVBusAvailable() );
 }
 
 /**
@@ -242,7 +245,7 @@ void processGamepadControls()
 
     gamepad.setLeftStick(joyScaledX, joyScaledY);
     gamepad.setButtonA(joyPressed);
-    gamepad.updateBLEdata();
+    gamepad.updateInputReport();
 
     //sprintf(logStr, "x: %d (raw: %d), y: %d (raw: %d), b: %d\n", joyScaledX, joyRawX, joyScaledY, joyRawY, joyPressed);
     //Serial.print(logStr);
@@ -273,7 +276,7 @@ void loop()
         M5.Lcd.printf("B:%d      ", joyPressed);
     }
 
-    // Do in slot 1 and 11
+    // Do in slot 1, 11 etc.
     if (curSlotNr % 10 == 1)
     {
         // If there is a bluetooth connection show the bluetooth icon on the display
@@ -299,7 +302,7 @@ void loop()
     /* ----- Update battery status ----- */
 
     // Do in slot 2
-    if (curSlotNr % 20 == 3)
+    if (curSlotNr == 3)
     {
         printRtcTimestamp();
         processAxp();

@@ -40,8 +40,6 @@ class GamepadBLE {
 
         bool isConnected();
 
-        void setBatteryLevel(uint8_t level);
-
         void setButtonA(bool state);
 
         void setButtonB(bool state);
@@ -67,9 +65,14 @@ class GamepadBLE {
         void setRightStickButton(bool state);
 
         /**
-         * Sends the current gamepad state to the connected host by means of a GATT notification.
+         * Sends the input report to the connected host device via BLE.
          */
-        void updateBLEdata();
+        void updateInputReport();
+
+        /**
+         * Sends the battery level to the connected host device via BLE.
+         */
+        void updateBatteryLevel(uint8_t level);
 
     private:
 
@@ -78,6 +81,9 @@ class GamepadBLE {
 
         // BLE GATT input report characteristic of the gamepad.
         BLECharacteristic* pInputCharacteristicId1_;
+
+        // BLE GATT battery level characteristic of the gamepad.
+        BLECharacteristic* pBatteryLevelCharacteristic_;
 
         /**
          * Connection status. True, if connected to host. 

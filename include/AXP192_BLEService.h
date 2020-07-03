@@ -74,16 +74,28 @@ class AXP192_BLEService {
         void setVBusPresent(uint8_t b);
 
         /**
+         * Sets the VBus Available indication.
+         * 
+         * @param b : : 0 = VBUS not available, 1 = VBUS available.
+         */
+        void setVBusAvailable(uint8_t b);
+
+        /**
          * Sets the ACIn Present indication.
          * 
          * @param b : : 0 = ACIN not present, 1 = ACIN present.
          */
         void setACInPresent(uint8_t b);
 
+        /**
+         * Sets the ACIn Available indication.
+         * 
+         * @param b : : 0 = ACIN not available, 1 = ACIN available.
+         */
+        void setACInAvailable(uint8_t b);
+
     private:
         BLEService*			powerService_;
-        BLEService*         chargeService_;
-        BLEService*         statusService_;
 
         BLECharacteristic* 	batVoltage_;
         BLECharacteristic* 	batPower_;
@@ -91,7 +103,11 @@ class AXP192_BLEService {
         BLECharacteristic* 	coulombData_;
 
         BLECharacteristic*	vBusPresent_;
+        BLECharacteristic*	vBusAvailable_;
+
         BLECharacteristic*	acInPresent_;
+        BLECharacteristic*	acInAvailable_;
+
         BLECharacteristic*	currentDirection_;
 
 };

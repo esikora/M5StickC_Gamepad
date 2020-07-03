@@ -22,11 +22,15 @@ class M5StickC_PowerManagement {
 
         static const float kCoulombThresholdNegative; // mAh
 
-        static const float kCoulombLowVoltage; // V
-
         static const float kCoulombLowVoltageMaxValue; // mAh
 
         static const uint8_t kAxp192StorageDefault[];
+
+        static const float kBatteryVoltageLow; // V
+
+        static const float kBatteryVoltageHigh; // V
+
+        static const float kBatteryChargeCurrentLow; // mA
 
         
 
@@ -91,6 +95,16 @@ class M5StickC_PowerManagement {
         inline float getChargeCurrent()
         {
             return batChargeCurrent_;
+        }
+
+        /**
+         * Returns the battery discharge current.
+         * 
+         * @return Battery discharge current [mA].
+         */
+        inline float getDischargeCurrent()
+        {
+            return batDischargeCurrent_;
         }
 
         /**
@@ -198,7 +212,11 @@ class M5StickC_PowerManagement {
          */
         inline float getBatteryLevelPercent()
         {
-            float batPerc = coulombData_ / coulombCounterMax_ * 100;
+            float batPerc = 0.0f;
+
+            if ( (coulombData_ > 0) && (coulombCounterMax_ > 0) ) {
+                batPerc = coulombData_ / coulombCounterMax_ * 100;
+            }
 
             return batPerc;
         }
@@ -233,13 +251,14 @@ class M5StickC_PowerManagement {
         // Maximum value of coulomb counter [mAh]
         float   coulombCounterMax_ = 0;
 
-        float 	batVoltage_;
-        float 	batPower_;
-        float 	batChargeCurrent_;
-        float 	coulombData_;
+        float 	batVoltage_             = 0.0f;
+        float 	batPower_               = 0.0f;
+        float 	batChargeCurrent_       = 0.0f;
+        float   batDischargeCurrent_    = 0.0f;
+        float 	coulombData_            = 0.0f;
 
-        uint8_t powerStatus_;
-        uint8_t powerModeChargeStatus_;
+        uint8_t powerStatus_            = 0;
+        uint8_t powerModeChargeStatus_  = 0;
 
         /**
          * Writes a float value and a key into the 6 byte AXP192 storage register.
