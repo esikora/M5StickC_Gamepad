@@ -32,8 +32,8 @@ void M5StickC_GamepadIO::start()
            Intention: Detect very short button activations between two calls of the "process" function
            The registered interrupt routines set a flag each time a button is pressed
         */
-        attachInterruptArg(digitalPinToInterrupt(kPinButtonBlue), isrBtnBlue, this, FALLING);
-        attachInterruptArg(digitalPinToInterrupt(kPinButtonRed),  isrBtnRed,  this, FALLING);
+        attachInterruptArg(digitalPinToInterrupt(kPinButtonBlue), isrBtnBlue, this, CHANGE);
+        attachInterruptArg(digitalPinToInterrupt(kPinButtonRed),  isrBtnRed,  this, CHANGE);
     }
 }
 
@@ -57,16 +57,16 @@ void M5StickC_GamepadIO::process()
     joyNormY_ = joyFactorY_ * (joyRawY_ - joyRawCenterY_);
 
     // Read current button states via GPIO
-    int btnBluePinValInv = !digitalRead(kPinButtonBlue);
-    int btnRedPinValInv  = !digitalRead(kPinButtonRed);
+    //int btnBluePinValInv = !digitalRead(kPinButtonBlue);
+    //int btnRedPinValInv  = !digitalRead(kPinButtonRed);
 
     // To detect button presses between two calls of "digitalRead", check the flags activated by interrupt routines
-    btnBluePressed_ = btnBluePinValInv || btnBlueFlag_;
-    btnRedPressed_  = btnRedPinValInv  || btnRedFlag_;
+    //btnBlueState_ = btnBluePinValInv || btnBlueFlag_;
+    //btnRedState_  = btnRedPinValInv  || btnRedFlag_;
 
     // Reset the flags
-    btnBlueFlag_ = 0;
-    btnRedFlag_ = 0;
+    //btnBlueFlag_ = 0;
+    //btnRedFlag_ = 0;
 }
 
 M5StickC_GamepadIO::~M5StickC_GamepadIO()

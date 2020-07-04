@@ -26,14 +26,57 @@ class M5StickC_GamepadIO
 
         void process();
 
+        /**
+         * Returns the current state of the blue button.
+         */
         inline uint8_t isBtnBluePressed()
         {
-            return btnBluePressed_;
+            return btnBlueState_;
+        }
+
+        /**
+         * Returns the flag value of the blue button.
+         * The flag is 1, if the blue button has been pressed since the last call of this function.
+         * The flag reset to 0 on each call of this function.
+         */
+        inline uint8_t wasBtnBluePressed()
+        {
+            // Save flag value
+            uint8_t result = btnBlueFlag_;
+
+            // Reset flag
+            btnBlueFlag_ = 0;
+
+            return result;
+        }
+
+        /**
+         * Returns 1 if the blue button is pressed or has been pressed since the last call.
+         */
+        inline uint8_t getBtnBlueActivation()
+        {
+            return isBtnBluePressed() || wasBtnBluePressed();
         }
 
         inline uint8_t isBtnRedPressed()
         {
-            return btnRedPressed_;
+            return btnRedState_;
+        }
+
+        inline uint8_t wasBtnRedPressed()
+        {
+            // Save flag value
+            uint8_t result = btnRedState_;
+
+            // Reset flag
+            btnRedState_ = 0;
+
+            return result;
+        }
+
+        inline uint8_t getBtnRedActivation()
+        {
+            return isBtnRedPressed() || wasBtnRedPressed();
         }
 
         inline int8_t getJoyNormX()
@@ -77,10 +120,10 @@ class M5StickC_GamepadIO
         volatile uint8_t btnRedFlag_ = 0;
 
         // State of blue button
-        uint8_t btnBluePressed_ = 0;
+        uint8_t btnBlueState_ = 0;
 
         // State of red button
-        uint8_t btnRedPressed_ = 0;
+        uint8_t btnRedState_ = 0;
 
 
         // Joystick center value for x-axis. The joystick unit provides values in a range of approx. 0..245
@@ -115,8 +158,15 @@ class M5StickC_GamepadIO
          */
         inline static void IRAM_ATTR isrBtnBlue(void *p)
         {
+            // Read current button state
+            uint8_t state = !digitalRead(kPinButtonBlue);
+
+            // Store button state
+            ((M5StickC_GamepadIO*) p)->btnBlueState_ = state;
+
             // Set flag to indicate that the butten has been pressed
-            ((M5StickC_GamepadIO*) p)->btnBlueFlag_ = 1;
+            if (state)
+                ((M5StickC_GamepadIO*) p)->btnBlueFlag_ = 1;
         }
 
         /**
@@ -124,7 +174,14 @@ class M5StickC_GamepadIO
          */
         inline static void IRAM_ATTR isrBtnRed(void *p)
         {
+            // Read current button state
+            uint8_t state = !digitalRead(kPinButtonRed);
+
+            // Store button state
+            ((M5StickC_GamepadIO*) p)->btnRedState_ = state;
+
             // Set flag to indicate that the butten has been pressed
-            ((M5StickC_GamepadIO*) p)->btnRedFlag_ = 1;
+            if (state)
+                ((M5StickC_GamepadIO*) p)->btnRedFlag_ = 1;
         }
 };
