@@ -28,7 +28,10 @@ void M5StickC_GamepadIO::start()
         pinMode(kPinButtonBlue, INPUT_PULLUP);
         pinMode(kPinButtonRed, INPUT_PULLUP);
 
-        // Register an interrupt routine for each button
+        /* Register an interrupt routine for each button
+           Intention: Detect very short button activations between two calls of the "process" function
+           The registered interrupt routines set a flag each time a button is pressed
+        */
         attachInterruptArg(digitalPinToInterrupt(kPinButtonBlue), isrBtnBlue, this, FALLING);
         attachInterruptArg(digitalPinToInterrupt(kPinButtonRed),  isrBtnRed,  this, FALLING);
     }
@@ -58,12 +61,12 @@ void M5StickC_GamepadIO::process()
     int btnRedPinValInv  = !digitalRead(kPinButtonRed);
 
     // To detect button presses between two calls of "digitalRead", check the flags activated by interrupt routines
-    btnBluePressed_ = btnBluePinValInv || btnBluePressedIsr_;
-    btnRedPressed_  = btnRedPinValInv  || btnRedPressedIsr_;
+    btnBluePressed_ = btnBluePinValInv || btnBlueFlag_;
+    btnRedPressed_  = btnRedPinValInv  || btnRedFlag_;
 
     // Reset the flags
-    btnBluePressedIsr_ = 0;
-    btnRedPressedIsr_ = 0;
+    btnBlueFlag_ = 0;
+    btnRedFlag_ = 0;
 }
 
 M5StickC_GamepadIO::~M5StickC_GamepadIO()

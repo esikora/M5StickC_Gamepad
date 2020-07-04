@@ -70,11 +70,11 @@ class M5StickC_GamepadIO
         // Initialization flag
         bool initialized_ = false;
 
-        // Press of blue button set by interrupt service routine
-        volatile uint8_t btnBluePressedIsr_ = 0;
+        // Flag that blue button has been pressed, set by interrupt service routine
+        volatile uint8_t btnBlueFlag_ = 0;
 
-        // Press of red button set by interrupt service routine
-        volatile uint8_t btnRedPressedIsr_ = 0;
+        // Flag that red button has been pressed, set by interrupt service routine
+        volatile uint8_t btnRedFlag_ = 0;
 
         // State of blue button
         uint8_t btnBluePressed_ = 0;
@@ -115,7 +115,8 @@ class M5StickC_GamepadIO
          */
         inline static void IRAM_ATTR isrBtnBlue(void *p)
         {
-            ((M5StickC_GamepadIO*) p)->btnBluePressedIsr_ = 1;
+            // Set flag to indicate that the butten has been pressed
+            ((M5StickC_GamepadIO*) p)->btnBlueFlag_ = 1;
         }
 
         /**
@@ -123,6 +124,7 @@ class M5StickC_GamepadIO
          */
         inline static void IRAM_ATTR isrBtnRed(void *p)
         {
-            ((M5StickC_GamepadIO*) p)->btnRedPressedIsr_ = 1;
+            // Set flag to indicate that the butten has been pressed
+            ((M5StickC_GamepadIO*) p)->btnRedFlag_ = 1;
         }
 };
