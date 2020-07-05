@@ -2,6 +2,9 @@
 
 #include <M5StickC.h>
 
+const uint8_t M5StickC_GamepadIO::kBtnPin[2] = {kPinButtonBlue, kPinButtonRed};
+
+
 M5StickC_GamepadIO* M5StickC_GamepadIO::getInstance()
 {
     static M5StickC_GamepadIO instance{};
@@ -32,8 +35,11 @@ void M5StickC_GamepadIO::start()
            Intention: Detect very short button activations between two calls of the "process" function
            The registered interrupt routines set a flag each time a button is pressed
         */
-        attachInterruptArg(digitalPinToInterrupt(kPinButtonBlue), isrBtnBlue, this, CHANGE);
-        attachInterruptArg(digitalPinToInterrupt(kPinButtonRed),  isrBtnRed,  this, CHANGE);
+        /*attachInterruptArg(digitalPinToInterrupt(kPinButtonBlue), isrBtnBlue, this, CHANGE);
+        attachInterruptArg(digitalPinToInterrupt(kPinButtonRed),  isrBtnRed,  this, CHANGE);*/
+
+        // Create task with maximum priority for reading the button states
+        xTaskCreate(M5StickC_GamepadIO::buttonTask, "Gamepad button task", 4096, this, configMAX_PRIORITIES - 1, NULL);
     }
 }
 
@@ -71,6 +77,6 @@ void M5StickC_GamepadIO::process()
 
 M5StickC_GamepadIO::~M5StickC_GamepadIO()
 {
-    detachInterrupt(kPinButtonBlue);
-    detachInterrupt(kPinButtonRed );
+    /*detachInterrupt(kPinButtonBlue);
+    detachInterrupt(kPinButtonRed );*/
 }

@@ -22,8 +22,14 @@ class M5StickC_GamepadIO
 
         static M5StickC_GamepadIO* getInstance();
 
+        /**
+         * Performs setup tasks to be able to acquire data from the control elements of the gamepasd.
+         */
         void start();
 
+        /**
+         * Obtains input values from the control elements and updates the corresponding state variables.
+         */
         void process();
 
         /**
@@ -156,7 +162,7 @@ class M5StickC_GamepadIO
         /**
          * Function is activated by an interrupt that is attached to GPIO pin of blue button
          */
-        inline static void IRAM_ATTR isrBtnBlue(void *p)
+        /*inline static void IRAM_ATTR isrBtnBlue(void *p)
         {
             // Read current button state
             uint8_t state = !digitalRead(kPinButtonBlue);
@@ -167,12 +173,12 @@ class M5StickC_GamepadIO
             // Set flag to indicate that the butten has been pressed
             if (state)
                 ((M5StickC_GamepadIO*) p)->btnBlueFlag_ = 1;
-        }
+        }*/
 
         /**
          * Function is activated by an interrupt that is attached to GPIO pin of red button
          */
-        inline static void IRAM_ATTR isrBtnRed(void *p)
+        /*inline static void IRAM_ATTR isrBtnRed(void *p)
         {
             // Read current button state
             uint8_t state = !digitalRead(kPinButtonRed);
@@ -183,5 +189,96 @@ class M5StickC_GamepadIO
             // Set flag to indicate that the butten has been pressed
             if (state)
                 ((M5StickC_GamepadIO*) p)->btnRedFlag_ = 1;
+        }*/
+
+        static const uint8_t kBtnCount = 2;
+
+        static const uint8_t kBtnPin[kBtnCount];
+
+        static const uint8_t kBtnEvDown = 1;
+        static const uint8_t kBtnEvUp   = 2;
+
+        static const TickType_t kBtnTaskDelay = 5 / portTICK_PERIOD_MS;
+
+        // Constants for detection of button actions
+        static const uint8_t kPatternMask  = 0b11100111;
+        static const uint8_t kPatternDown  = 0b00000111;
+        static const uint8_t kPatternUp    = 0b11100000;
+
+        /**
+         * Continuously reads and processes the button states from the digital IO pins at a frequency of about 200 Hz.
+         * Updates button histories, performs debouncing, and detects button down and button up events.
+         * This function is exectuted inside of a high priority task.
+         */
+        inline static void buttonTask(void *p)
+        {   
+            while (true)
+            {
+                // Initalize a static buffer for state history (on the first execution of this function)
+                static uint8_t btnHistories[kBtnCount] = {0};
+
+                // Initalize a static buffer for storing button events (on the first execution of this function)
+                static uint8_t btnEvents[kBtnCount] = {0};
+
+                // Loop over all buttons
+                for (uint8_t btnIdx = 0; btnIdx < kBtnCount; ++btnIdx)
+                {
+                    // Update history of the button by appending current state bit at the end
+                    btnHistories[btnIdx] = ( btnHistories[btnIdx] << 1 ) | ( !digitalRead( kBtnPin[btnIdx] ) );
+
+                    // Apply bit mask to cancel out irrelevant bits (i.e. where the signal may bounce)
+                    uint8_t btnHistMasked = btnHistories[btnIdx] & kPatternMask;
+
+                    // Check history for "button down" pattern
+                    if (btnHistMasked == kPatternDown)
+                    {
+                        btnEvents[btnIdx] = kBtnEvDown;
+                        btnHistories[btnIdx] = 0xFF;
+                    }
+                    else
+                        // Check history for "button up" pattern
+                        if (btnHistMasked == kPatternUp)
+                        {
+                            btnEvents[btnIdx] = kBtnEvUp;
+                            btnHistories[btnIdx] = 0x00;
+                        }
+                    
+                } // end of for loop over all buttons
+
+                // Update button flags and states based on the detected events
+                ((M5StickC_GamepadIO*) p)->updateButtonStates(btnEvents);
+
+                // Let other tasks execute
+                vTaskDelay(kBtnTaskDelay);
+            }
+        }
+
+        inline void updateButtonStates(uint8_t btnEvents[])
+        {
+            // @TODO: Add semaphore to avoid race conditions?
+
+            switch (btnEvents[0])
+            {
+                case kBtnEvDown:
+                    btnBlueFlag_  = 1;
+                    btnBlueState_ = 1;
+                    break;
+
+                case kBtnEvUp:
+                    btnBlueState_ = 0;
+                    break;
+            }
+
+            switch (btnEvents[1])
+            {
+                case kBtnEvDown:
+                    btnRedFlag_   = 1;
+                    btnRedState_  = 1;
+                    break;
+
+                case kBtnEvUp:
+                    btnRedState_  = 0;
+                    break;
+            }
         }
 };
