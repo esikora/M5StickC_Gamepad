@@ -220,8 +220,8 @@ void processGamepadControls()
     gamepadBle.setLeftStickButton( pGamepadIO->isJoyPressed() );
 
     // Set A and B button
-    gamepadBle.setButtonA( pGamepadIO->isBtnBluePressed() );
-    gamepadBle.setButtonB( pGamepadIO->isBtnRedPressed() );
+    gamepadBle.setButtonA( pGamepadIO->getBtnBlueActivation() );
+    gamepadBle.setButtonB( pGamepadIO->getBtnRedActivation()  );
 
     // Send data to host device
     gamepadBle.updateInputReport();
