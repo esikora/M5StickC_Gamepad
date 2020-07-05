@@ -76,8 +76,11 @@ GamepadBLE gamepadBle;
 // Object providing convenient access to gamepad peripherals
 M5StickC_GamepadIO *pGamepadIO = nullptr;
 
+
+#ifdef AXP192BLE
 // Object providing power management information via BLE
 AXP192_BLEService axp192Ble;
+#endif
 
 // Object providing utility functions for accessing power management data
 M5StickC_PowerManagement axp192PowMan;
@@ -155,7 +158,10 @@ void setup()
     setupBLE();
 
     gamepadBle.start(pServer);
+
+    #ifdef AXP192BLE
     axp192Ble.start(pServer);
+    #endif
 }
 
 /**
@@ -175,6 +181,7 @@ void processAxp()
     uint8_t batLvlPerc = (uint8_t) axp192PowMan.getBatteryLevelPercent();
     gamepadBle.updateBatteryLevel(batLvlPerc);
 
+    #ifdef AXP192BLE
     // Update AXP192 BLE service data
     axp192Ble.setBatVoltage( axp192PowMan.getBatVoltage() );
     axp192Ble.setBatPower( axp192PowMan.getBatPower() );
@@ -185,6 +192,7 @@ void processAxp()
     axp192Ble.setACInAvailable( axp192PowMan.isACInPresent() );
     axp192Ble.setVBusPresent( axp192PowMan.isVBusPresent() );
     axp192Ble.setVBusAvailable( axp192PowMan.isVBusAvailable() );
+    #endif
 }
 
 /**
@@ -227,6 +235,46 @@ void processGamepadControls()
     gamepadBle.updateInputReport();
 }
 
+void updateDisplaySlow()
+{
+    static bool previouslyConnected = false;
+    
+    bool connected = gamepadBle.isConnected();
+
+    // If there is a bluetooth connection show the bluetooth icon on the display
+    if (connected)
+    {
+        // Update only if there has been a change in the connection state
+        if (!previouslyConnected) {
+            
+            uint16_t i = 0;
+
+            for (uint16_t imgY = 0; imgY < icon_bluetooth.height; ++imgY)
+            {
+                for (uint16_t imgX = 0; imgX < icon_bluetooth.width; ++imgX)
+                {
+                    M5.Lcd.drawPixel(imgX, imgY, icon_bluetooth.data[i]);
+                    ++i;
+                }
+            }
+
+            // Store current connection state
+            previouslyConnected = connected;
+        }
+    }
+    else {
+        // Update only if there has been a change in the connection state
+        if (previouslyConnected)
+        {
+            // Draw rectangle with background colour
+            M5.Lcd.fillRect(0, 0, 16, 24, 0);
+
+            // Store current connection state
+            previouslyConnected = connected;
+        }
+    }
+}
+
 void loop()
 {
     timeStartMicros = micros();
@@ -236,7 +284,7 @@ void loop()
 
     /* ----- Read gamepad controls and send to host ------ */
     
-    // Do every second slot
+    // Do in every slot
     processGamepadControls();
 
     /* ----- Update display ----- */
@@ -255,24 +303,7 @@ void loop()
     // Do in slot 1, 21 etc.
     if (curSlotNr % 20 == 1)
     {
-        // If there is a bluetooth connection show the bluetooth icon on the display
-        if (gamepadBle.isConnected()) {
-            
-            uint16_t i = 0;
-
-            for (uint16_t imgY = 0; imgY < icon_bluetooth.height; ++imgY)
-            {
-                for (uint16_t imgX = 0; imgX < icon_bluetooth.width; ++imgX)
-                {
-                    M5.Lcd.drawPixel(imgX, imgY, icon_bluetooth.data[i]);
-                    ++i;
-                }
-            }
-        }
-        else {
-            // Draw rectangle with background colour
-            M5.Lcd.fillRect(0, 0, 16, 24, 0);
-        }
+        updateDisplaySlow();
     }
 
     /* ----- Update battery status ----- */
