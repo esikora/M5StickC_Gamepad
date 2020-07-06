@@ -58,68 +58,63 @@ void GamepadBLE::setRightStick(StickAxis_t xPos, StickAxis_t yPos) {
     gamepadData_.stickRY = yPos;
 }
 
-void GamepadBLE::start(BLEServer* pServer) {
+void GamepadBLE::start(BLEServer* pServer, const tDeviceInfo &deviceInfo) {
 
     Serial.println("[V][GamepadBLE.cpp] start(): >> start");
     Serial.flush();
 
     // Debug output
     Serial.print("#Bytes in struct Generic2: ");
-    Serial.println(sizeof(StructGamepadInputGeneric2_t));
+    Serial.println(sizeof(tGamepadReportStructGeneric2));
     Serial.print("#Bytes in struct gamepadData_: ");
     Serial.println(sizeof(gamepadData_));
 
     // Create HID device with required GATT services and characteristics
     pHIDdevice_ = new BLEHIDDevice(pServer);
 
-    std::string manufacturerStr = "DIY";
-    pHIDdevice_->manufacturer()->setValue(manufacturerStr);
+    // Set the value of the "Manufacturer Name String" characteristic (UUID 0x2A29) of the "Device Information" service (UUID 0x180A)
+    pHIDdevice_->manufacturer()->setValue(deviceInfo.manufacturerNameString);
 
-    /* GATT Characteristic 'PNP ID':
+    
+    // Set the values of the "PnP ID" characteristic (UUID 0x2A50) of the "Device Information" service (UUID0x180A)
+    pHIDdevice_->pnp(
+        deviceInfo.vendorIdSource,
+        deviceInfo.vendorId,
+        deviceInfo.productId,
+        deviceInfo.productVersion
+    );
 
-       Source: https://www.partsnotincluded.com/understanding-the-xbox-360-wired-controllers-usb-data/
-
-       1. Vendor ID Source: 0x02 = 'USB Implementer’s Forum assigned Vendor ID value'
-       2. Vendor ID: 0x045E = 'Microsoft Corporation'
-       3. Product ID: 0x02FD = 'XBOX ONE S Controller [Bluetooth]'
-       4. Product Version = '1.1.4' (TBD)
-    */
-    //pHIDdevice_->pnp(0x02, 0x045E, 0x02FD, 0x0114);
-    pHIDdevice_->pnp(0x01, 0x02e5, 0xabcd, 0x0110); // Source: https://github.com/lemmingDev/ESP32-BLE-Gamepad/blob/master/BleGamepad.cpp
-
-    /* GATT Characteristic 'HID information':
-         1. Country: 0x00 = not localized 
-         2. Flags (bitfield): 0x03 = 'bit0: capable of providing wake-up signal to a HID host' | 'bit1: normally connectable'
-    */    
-    //pHIDdevice_->hidInfo(0x00, 0x02);
-    pHIDdevice_->hidInfo(0x00, 0x01); // Source: https://github.com/lemmingDev/ESP32-BLE-Gamepad/blob/master/BleGamepad.cpp
+    // Set the values of the "HID Information" characteristic (UUID 0x2A4A) of the "Human Interface Device" service (UUID 0x1812)
+    pHIDdevice_->hidInfo(
+        deviceInfo.country,
+        deviceInfo.flags
+    );
 
     // Setup BLE security
     BLESecurity security;
     security.setAuthenticationMode(ESP_LE_AUTH_BOND);
 
-    // Set the gamepad HID report descriptor
-    //pHIDdevice_->reportMap( (uint8_t*) kReportDescriptorXBoxOneS, sizeof(kReportDescriptorXBoxOneS));
-    pHIDdevice_->reportMap( (uint8_t*) kReportDescriptorGeneric2, sizeof(kReportDescriptorGeneric2));
+    // Set the value of the "Report Map" characteristic (UUID 0x2A4B) of the "Human Interface Device" service (UUID 0x1812)
+    pHIDdevice_->reportMap( (uint8_t*) pGamepadReportMap, kGamepadReportMapSize );
 
     // Message size check
-    if ( sizeof(gamepadData_) != kMsgSizeReportGeneric2 )
+    if ( sizeof(gamepadData_) != kGamepadReportSize )
     {
         char log[150];
 
         sprintf(log,
             "[E][GamepadBLE.cpp] start(): Wrong size of message struct. Check padding! Expected size is %d. Actual size of gamepadData_ is %d.",
-            kMsgSizeReportGeneric2,
+            kGamepadReportSize,
             sizeof(gamepadData_) );
 
         Serial.println(log);
         Serial.flush();
     }
 
-    // Create the input report characteristic for the gamepad state
-    pInputCharacteristicId1_ = pHIDdevice_->inputReport(1);
+    // Create the characteristic for reporting the gamepad state (UUID 0x2A4D)
+    pInputCharacteristicId1_ = pHIDdevice_->inputReport(1); // report ID 0x01
 
-    // Enable server-initiated notifications for the "input report" characteristic
+    // Enable server-initiated notifications for the report characteristic
     ((BLE2902*) pInputCharacteristicId1_->getDescriptorByUUID(BLEUUID((uint16_t) 0x2902)))->setNotifications(true);
 
     // Register callback object to listen for connect and disconnect events
@@ -137,14 +132,19 @@ void GamepadBLE::start(BLEServer* pServer) {
     // Start the service
     pHIDdevice_->startServices();
 
-    // Advertise the HID gamepad service
+    /* ----- Setup the BLE advertising data for the HID gamepad device ----- */
     BLEAdvertising *pAdvertising = pServer->getAdvertising();
-    //pAdvertising->setScanResponse(false); // required to allow for device name with length > 23
-    //pAdvertising->setMinPreferred(0x0); // required to allow for device name with length > 23
+    
     pAdvertising->setAppearance(HID_GAMEPAD);
     pAdvertising->addServiceUUID(pHIDdevice_->hidService()->getUUID());
+
+    pAdvertising->setScanResponse(true); // required to allow for device name with length > 23
+    //pAdvertising->setMinPreferred(0x0); // required to allow for device name with length > 23
+    
+    // Start advertising
     pAdvertising->start();
 
+    // Debug output
     UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
     Serial.print("[V][GamepadBLE.cpp] start(): StackHighWaterMark = ");
     Serial.println(uxHighWaterMark);
@@ -165,7 +165,7 @@ void GamepadBLE::updateInputReport() {
     }
 
     // Debug output
-    if (gamepadData_.btn01) {
+    if (gamepadData_.btn09) {
         uint8_t* pData = (uint8_t*) &gamepadData_;
 
         for (int i = 0; i < sizeof(gamepadData_); i++) {

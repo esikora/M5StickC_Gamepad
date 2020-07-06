@@ -22,8 +22,6 @@
 class GamepadBLE {
 
     public:
-        // Struct that is used for storing and transmitting the gamepad state.
-        typedef StructGamepadInputGeneric2_t StructGamepadInput_t;
 
         // Type that is used for x- and y-axis values.
         typedef int16_t StickAxis_t;
@@ -35,8 +33,12 @@ class GamepadBLE {
 
         /**
          * Initializes the necessary GATT services of the HID device and starts the BLE server.
+         * 
+         * @param pServer Pointer to the BLE server object.
+         * 
+         * @param deviceInfo Required device information for the Bluetooth HID device such as device name and PNP-Info.
          */ 
-        void start(BLEServer* pServer);
+        void start(BLEServer* pServer, const tDeviceInfo &deviceInfo);
 
         bool isConnected();
 
@@ -91,9 +93,13 @@ class GamepadBLE {
         bool connected_;
 
         /**
-         * Current values of main gamepad controls, i.e. sticks and buttons.
+         * HID report that is provided to the connected host (Characteristic UUID 0x2A4D).
+         * It contains the current values of the gamepad controls, i.e. sticks and buttons.
+         * 
+         * The struct datatype complies with the format that is defined by the report map
+         * (Characteristic UUID 0x2A4A).
          */
-        StructGamepadInput_t gamepadData_;
+        tGamepadReportStruct gamepadData_;
 
         class ConnectionEventCallback : public BLEServerCallbacks
         {

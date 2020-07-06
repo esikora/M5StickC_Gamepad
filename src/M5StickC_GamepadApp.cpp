@@ -134,8 +134,7 @@ BLEServer *pServer = nullptr;
 void setupBLE()
 {
     // Initialize bluetooth device
-    std::string deviceStr = "ESP32 BLE Controller";
-    BLEDevice::init(deviceStr);
+    BLEDevice::init(kGamepadDeviceInfo.deviceName);
     BLEDevice::setPower(ESP_PWR_LVL_P9);
 
     // Create BLE GATT server
@@ -157,11 +156,14 @@ void setup()
 
     setupBLE();
 
-    gamepadBle.start(pServer);
+    gamepadBle.start(pServer, kGamepadDeviceInfo);
 
     #ifdef AXP192BLE
     axp192Ble.start(pServer);
     #endif
+
+    // Yield and let other tasks initialize
+    delay(200);
 }
 
 /**
