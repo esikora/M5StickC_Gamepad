@@ -64,8 +64,6 @@ void M5StickC_PowerManagement::readData()
  */
 void M5StickC_PowerManagement::computeBatteryCapacity()
 {
-    char strOut[150];
-
     // Is the device attached to a power source?
     if (isVBusPresent())
     {
