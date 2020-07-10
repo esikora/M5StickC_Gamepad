@@ -68,6 +68,7 @@ class GamepadBLE {
 
         /**
          * Sends the input report to the connected host device via BLE.
+         * Does nothing if no host is connected.
          */
         void updateInputReport();
 
@@ -100,18 +101,23 @@ class GamepadBLE {
          */
         ~GamepadBLE();
 
-
-        // BLE HID device consisting of several GATT services and characteristics
+        /**
+         * BLE HID device consisting of several GATT services and characteristics.
+         */
         BLEHIDDevice* pHIDdevice_;
 
-        // BLE GATT input report characteristic of the gamepad.
+        /**
+         * BLE GATT report characteristic of the gamepad.
+         */
         BLECharacteristic* pInputCharacteristicId1_;
 
-        // BLE GATT battery level characteristic of the gamepad.
+        /**
+         * BLE GATT battery level characteristic of the gamepad.
+         */
         BLECharacteristic* pBatteryLevelCharacteristic_;
 
         /**
-         * Connection status. True, if connected to host. 
+         * Connection status. True, if gamepad is connected to a host.
          */
         bool connected_ = false;
 
@@ -123,20 +129,24 @@ class GamepadBLE {
          * (Characteristic UUID 0x2A4A).
          */
         tGamepadReportStruct gamepadData_;
-
+        
+        /**
+         * Enum that defines the available methods for configuration and start of BLE advertisement.
+         */
         enum tAdvLib { NONE = 0, ESP_BLE = 1, ESP_IDF = 2 };
 
+        /**
+         * Defines which method is used to configure and start BLE advertisement.
+         */
         tAdvLib advLib_ = tAdvLib::NONE;
 
         /**
-         * Defines advertisement data and scan response data using ESP BLE library structs
-         * and functions.
+         * Defines advertisement data and scan response data using ESP BLE library structs and functions.
          */
         void setupAdvertisementDataBleLib();
 
         /**
-         * Defines advertisement data and scan response data by providing raw data to the
-         * ESP BLE library functions.
+         * Defines advertisement data and scan response data by providing raw data to the ESP BLE library functions.
          */
         void setupAdvertisementDataBleRaw(const std::string &deviceName);
 
@@ -148,8 +158,7 @@ class GamepadBLE {
         esp_ble_adv_params_t advParamsIdf_;
 
         /**
-         * Defines advertisement data and scan response data using ESP-IDF library structs
-         * and functions.
+         * Defines advertisement data and scan response data using ESP-IDF library structs and functions.
          */
         void setupAdvertisementDataEspIdf(const std::string &deviceName);
 
@@ -168,6 +177,9 @@ class GamepadBLE {
          */
         static void gapEventHandler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 
+        /**
+         * Callback class that is registered at the BLE server to detect 'connect' and 'disconnect' events.
+         */
         class ConnectionEventCallback : public BLEServerCallbacks
         {
             public:

@@ -70,14 +70,7 @@ void GamepadBLE::setRightStick(StickAxis_t xPos, StickAxis_t yPos) {
 
 void GamepadBLE::start(BLEServer* pServer, const tDeviceInfo &deviceInfo) {
 
-    Serial.println("[V][GamepadBLE.cpp] start(): >> start");
-    Serial.flush();
-
-    // Debug output
-    Serial.print("#Bytes in struct Generic2: ");
-    Serial.println(sizeof(tGamepadReportStructGeneric2));
-    Serial.print("#Bytes in struct gamepadData_: ");
-    Serial.println(sizeof(gamepadData_));
+    log_v(">>");
 
     // Create HID device with required GATT services and characteristics
     pHIDdevice_ = new BLEHIDDevice(pServer);
@@ -110,15 +103,11 @@ void GamepadBLE::start(BLEServer* pServer, const tDeviceInfo &deviceInfo) {
     // Message size check
     if ( sizeof(gamepadData_) != kGamepadReportSize )
     {
-        char log[150];
-
-        sprintf(log,
-            "[E][GamepadBLE.cpp] start(): Wrong size of message struct. Check padding! Expected size is %d. Actual size of gamepadData_ is %d.",
+        log_e(
+            "Wrong size of message struct. Check padding! Expected size is %d. Actual size of gamepadData_ is %d.",
             kGamepadReportSize,
-            sizeof(gamepadData_) );
-
-        Serial.println(log);
-        Serial.flush();
+            sizeof(gamepadData_)
+        );
     }
 
     // Create the characteristic for reporting the gamepad state (UUID 0x2A4D)
@@ -149,13 +138,7 @@ void GamepadBLE::start(BLEServer* pServer, const tDeviceInfo &deviceInfo) {
     // Start advertising using the previously defined configuration data
     startAdvertising();
 
-    // Debug output
-    UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    Serial.print("[V][GamepadBLE.cpp] start(): StackHighWaterMark = ");
-    Serial.println(uxHighWaterMark);
-
-    Serial.println("[V][GamepadBLE.cpp] start(): << start");
-    Serial.flush();
+    log_v("<<");
 };
 
 void GamepadBLE::setupAdvertisementDataBleLib()
@@ -284,20 +267,26 @@ void GamepadBLE::startAdvertising()
             esp_ble_gap_start_advertising(&advParamsIdf_);
 
             // Synchronize on the event 'ESP_GAP_BLE_ADV_START_COMPLETE_EVT' (possibly unnecessary)
-            //xSemaphoreTake(espBleGapEventSemaphore_, portMAX_DELAY);
+            // Presently, 'gapEventHandler' is only used for synchronisation in 'setupAdvertisementDataEspIdf'
+            /*
+            if (espBleGapEventSemaphore_ != nullptr)
+            {
+                xSemaphoreTake(espBleGapEventSemaphore_, portMAX_DELAY);
+            }
+            */
 
             break;
 
         default:
-            Serial.println("GamepadBLE::startAdvertising(): Error - Unexpected value of advLib_.");
+            log_e("Unexpected value of advLib_: %d", advLib_);
+            break;
 
     }
 }
 
 void GamepadBLE::updateInputReport() {
 
-    //Serial.println("[V][GamepadBLE.cpp] updateInputReport(): >> updateInputReport");
-    //Serial.flush();
+    log_v(">>");
 
     if (connected_)
     {
@@ -309,21 +298,27 @@ void GamepadBLE::updateInputReport() {
     if (gamepadData_.btn09) {
         uint8_t* pData = (uint8_t*) &gamepadData_;
 
-        for (int i = 0; i < sizeof(gamepadData_); i++) {
-            Serial.print(pData[i]);
-            Serial.print(' ');
+        // Convert report to hex string
+        std::string hexStr = "";
+        char hexByteStr[4];
+
+        for (int i = 0; i < sizeof(gamepadData_); i++)
+        {
+            sprintf(hexByteStr, "%02x ", pData[i]);
+            hexStr.append(hexByteStr);
         }
 
-        Serial.println();
-        Serial.flush();
+        log_d("Report data hex: %s[%d bytes]", hexStr.c_str(), sizeof(gamepadData_));
     }
 
-    //Serial.println("[V][GamepadBLE.cpp] updateInputReport(): << updateInputReport");
-    //Serial.flush();
+    log_v("<<");
 }
 
 void GamepadBLE::updateBatteryLevel(uint8_t level) {
-    //pHIDdevice_->setBatteryLevel(level);
+    /* Not using the following function because, in addition, notify is needed.
+       Without notification, the connected host will not get updates of the battery level.
+       Instead the characteristic is accessed directly. */
+    // pHIDdevice_->setBatteryLevel(level);
 
     if (connected_)
     {
@@ -345,19 +340,19 @@ GamepadBLE::ConnectionEventCallback::ConnectionEventCallback(GamepadBLE* pGamepa
 
 void GamepadBLE::ConnectionEventCallback::onConnect(BLEServer* pServer)
 {
-    // Debug output
-    Serial.println("onConnect");
-    Serial.flush();
+    log_v(">>");
 
     // Enable server-initiated notifications
     // ((BLE2902*) pGamepad_->pInputCharacteristicId1_->getDescriptorByUUID(BLEUUID((uint16_t) 0x2902)))->setNotifications(true);
 
     pGamepad_->connected_ = true;
+
+    log_v("<<");
 }
 
 void GamepadBLE::ConnectionEventCallback::onDisconnect(BLEServer* pServer)
 {
-    Serial.println("onDisconnect");
+    log_v(">>");
 
     pGamepad_->connected_ = false;
 
@@ -366,38 +361,42 @@ void GamepadBLE::ConnectionEventCallback::onDisconnect(BLEServer* pServer)
 
     // Restart advertising after host closed the connection
     pGamepad_->startAdvertising();
+
+    log_v("<<");
 }
 
 void GamepadBLE::gapEventHandler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
     /* Note: This function is called by the bluetooth task, not by the gamepad application task */
 
-    log_d("gapEventHandler [event no: %d]", (int)event);
+    log_d("gapEventHandler [event no: %d]", (int) event);
 
-    switch (event)
+    if (getInstance()->espBleGapEventSemaphore_ != nullptr)
     {
-        case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
-            xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
-            break;
+        switch (event)
+        {
+            case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
+                xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
+                break;
 
-        case ESP_GAP_BLE_SCAN_RSP_DATA_SET_COMPLETE_EVT:
-            xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
-            break;
+            case ESP_GAP_BLE_SCAN_RSP_DATA_SET_COMPLETE_EVT:
+                xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
+                break;
 
-        case ESP_GAP_BLE_ADV_DATA_RAW_SET_COMPLETE_EVT:
-            xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
-            break;
+            case ESP_GAP_BLE_ADV_DATA_RAW_SET_COMPLETE_EVT:
+                xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
+                break;
 
-        case ESP_GAP_BLE_SCAN_RSP_DATA_RAW_SET_COMPLETE_EVT:
-            xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
-            break;
+            case ESP_GAP_BLE_SCAN_RSP_DATA_RAW_SET_COMPLETE_EVT:
+                xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
+                break;
 
-        case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
-            //xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
-            break;
+            case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
+                //xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
+                break;
 
-        default:
-            break; // do nothing
+            default:
+                break; // do nothing
+        }
     }
-
 }
