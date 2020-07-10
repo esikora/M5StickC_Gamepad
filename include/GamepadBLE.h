@@ -27,9 +27,9 @@ class GamepadBLE {
         typedef int16_t StickAxis_t;
 
         /**
-         * Creates a new GamepadBLE object. 
+         * Returns singleton instance of the gamepad class.
          */
-        GamepadBLE();
+        static GamepadBLE* getInstance();
 
         /**
          * Initializes the necessary GATT services of the HID device and starts the BLE server.
@@ -76,7 +76,30 @@ class GamepadBLE {
          */
         void updateBatteryLevel(uint8_t level);
 
+        // Delete copy constructor to prevent creation of additinal instances
+        GamepadBLE(const GamepadBLE&) = delete;
+
+        // Delete copy assignment operator to prevent creation of additinal instances
+        GamepadBLE& operator = (const GamepadBLE&) = delete;
+
+        // Delete move constructor to prevent creation of additinal instances
+        GamepadBLE(GamepadBLE&&) = delete;
+
+        // Delete move assignment operator to prevent creation of additinal instances
+        GamepadBLE& operator = (GamepadBLE&&) = delete;
+
     private:
+
+        /**
+         * Creates a new GamepadBLE object. 
+         */
+        GamepadBLE();
+
+        /**
+         * Frees resources of GamepadBLE object on destruction.
+         */
+        ~GamepadBLE();
+
 
         // BLE HID device consisting of several GATT services and characteristics
         BLEHIDDevice* pHIDdevice_;
@@ -90,7 +113,7 @@ class GamepadBLE {
         /**
          * Connection status. True, if connected to host. 
          */
-        bool connected_;
+        bool connected_ = false;
 
         /**
          * HID report that is provided to the connected host (Characteristic UUID 0x2A4D).
@@ -135,6 +158,15 @@ class GamepadBLE {
          */
         void startAdvertising();
 
+        /**
+         * Semaphore used to synchronize on BLE GAP events of ESP-IDF during configuration of BLE advertisement.
+         */
+        SemaphoreHandle_t espBleGapEventSemaphore_ = nullptr;
+
+        /**
+         * GAP event handler used to synchronize on BLE GAP events of ESP-IDF during configuration of BLE advertisement.
+         */
+        static void gapEventHandler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 
         class ConnectionEventCallback : public BLEServerCallbacks
         {
@@ -148,8 +180,5 @@ class GamepadBLE {
             private:
                 GamepadBLE* pGamepad_;
         };
-
-
-        static void gapEventHandler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 
 };

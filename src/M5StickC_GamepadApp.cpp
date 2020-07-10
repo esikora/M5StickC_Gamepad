@@ -70,10 +70,10 @@ typedef struct {
 // Struct with image data of the bluetooth icon
 static const tImage icon_bluetooth = { image_data_icon_bluetooth, 16, 24, 16 };
 
-// Object providing the gamepad service via BLE
-GamepadBLE gamepadBle;
+// Pointer to object providing the gamepad service via BLE
+GamepadBLE *pGamepadBle = nullptr;
 
-// Object providing convenient access to gamepad peripherals
+// Pointer to object providing access to gamepad peripherals
 M5StickC_GamepadIO *pGamepadIO = nullptr;
 
 
@@ -156,7 +156,8 @@ void setup()
 
     setupBLE();
 
-    gamepadBle.start(pServer, kGamepadDeviceInfo);
+    pGamepadBle = GamepadBLE::getInstance();
+    pGamepadBle->start(pServer, kGamepadDeviceInfo);
 
     #ifdef AXP192BLE
     axp192Ble.start(pServer);
@@ -181,7 +182,7 @@ void processAxp()
 
     // Set battery level of gamepad
     uint8_t batLvlPerc = (uint8_t) axp192PowMan.getBatteryLevelPercent();
-    gamepadBle.updateBatteryLevel(batLvlPerc);
+    pGamepadBle->updateBatteryLevel(batLvlPerc);
 
     #ifdef AXP192BLE
     // Update AXP192 BLE service data
@@ -224,17 +225,17 @@ void processGamepadControls()
     GamepadBLE::StickAxis_t joyScaledY = pGamepadIO->getJoyNormY() << 8;
 
     // Set left stick axis values
-    gamepadBle.setLeftStick(joyScaledX, joyScaledY);
+    pGamepadBle->setLeftStick(joyScaledX, joyScaledY);
 
     // Set stick button state
-    gamepadBle.setLeftStickButton( pGamepadIO->isJoyPressed() );
+    pGamepadBle->setLeftStickButton( pGamepadIO->isJoyPressed() );
 
     // Set A and B button
-    gamepadBle.setButtonA( pGamepadIO->getBtnBlueActivation() );
-    gamepadBle.setButtonB( pGamepadIO->getBtnRedActivation()  );
+    pGamepadBle->setButtonA( pGamepadIO->getBtnBlueActivation() );
+    pGamepadBle->setButtonB( pGamepadIO->getBtnRedActivation()  );
 
     // Send data to host device
-    gamepadBle.updateInputReport();
+    pGamepadBle->updateInputReport();
 }
 
 void updateDisplayFast()
@@ -251,7 +252,7 @@ void updateDisplaySlow()
 {
     static bool previouslyConnected = false;
     
-    bool connected = gamepadBle.isConnected();
+    bool connected = pGamepadBle->isConnected();
 
     // If there is a bluetooth connection show the bluetooth icon on the display
     if (connected)
