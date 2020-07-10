@@ -237,6 +237,16 @@ void processGamepadControls()
     gamepadBle.updateInputReport();
 }
 
+void updateDisplayFast()
+{
+    M5.Lcd.setCursor(100, 50, 4);
+    M5.Lcd.printf("X:%d      ", pGamepadIO->getJoyNormX());
+    M5.Lcd.setCursor(100, 80, 4);
+    M5.Lcd.printf("Y:%d      ", pGamepadIO->getJoyNormY());
+    M5.Lcd.setCursor(100, 110, 4);
+    M5.Lcd.printf("%d%d%d", pGamepadIO->isJoyPressed(), pGamepadIO->isBtnBluePressed(), pGamepadIO->isBtnRedPressed());
+}
+
 void updateDisplaySlow()
 {
     static bool previouslyConnected = false;
@@ -279,10 +289,16 @@ void updateDisplaySlow()
 
 void loop()
 {
+    // Store start time of loop() to compute duration later on
     timeStartMicros = micros();
 
     //Serial.println("[V][M5StickC_GamepadApp.cpp] loop(): >> loop");
     //Serial.flush();
+
+    // In the first slot of a cycle, reset the "max slot duration per cycle"
+    if (curSlotNr == 0) {
+        timeDeltaMaxInCycleMicros = 0;
+    }
 
     /* ----- Read gamepad controls and send to host ------ */
     
@@ -294,15 +310,10 @@ void loop()
     // Do every second slot
     if (curSlotNr % 2 == 0)
     {
-        M5.Lcd.setCursor(100, 50, 4);
-        M5.Lcd.printf("X:%d      ", pGamepadIO->getJoyNormX());
-        M5.Lcd.setCursor(100, 80, 4);
-        M5.Lcd.printf("Y:%d      ", pGamepadIO->getJoyNormY());
-        M5.Lcd.setCursor(100, 110, 4);
-        M5.Lcd.printf("%d%d%d", pGamepadIO->isJoyPressed(), pGamepadIO->isBtnBluePressed(), pGamepadIO->isBtnRedPressed());
+        updateDisplayFast();
     }
 
-    // Do in slot 1, 21 etc.
+    // Do every 20 slots in slot 1, 21 etc.
     if (curSlotNr % 20 == 1)
     {
         updateDisplaySlow();
@@ -319,7 +330,7 @@ void loop()
 
     /* ----- Print statistics about computation time ----- */
     
-    // Do in last slot of each cycle
+    // Do in last slot of each cycle (stats of the last slot itself are not accounted for)
     if (curSlotNr == kNumSlots - 1)
     {
         sprintf(strOut, "Duration of loop execution in microseconds: %d (last), %d (max in cylce), %d (max overall)",
@@ -330,22 +341,9 @@ void loop()
         Serial.println(strOut);
     }
     
-    /* ----- Update slot number and compute duration stats ----- */
     
-    if (curSlotNr == 0) {
-        timeDeltaMaxInCycleMicros = 0;
-    }
-
-    curSlotNr = (curSlotNr + 1) % kNumSlots;
-
-    //Serial.println("[V][M5StickC_GamepadApp.cpp] loop(): << loop");
-    //Serial.flush();
-
-    /* ----- Wait until next cycle ----- */
-    
-    timeEndMicros = micros();
-
     // Compute duration of loop
+    timeEndMicros = micros();
     timeDeltaMicros = timeEndMicros - timeStartMicros;
 
     // Update maximum slot duration within cycle
@@ -360,13 +358,21 @@ void loop()
         }
     }
 
-    // Print warning when slot time has been exceed
+    // Increase slot number up to end of cycle
+    curSlotNr = (curSlotNr + 1) % kNumSlots;
+
+
+    //Serial.println("[V][M5StickC_GamepadApp.cpp] loop(): << loop");
+    //Serial.flush();
+
+    /* ----- Wait remaining time until next slot ----- */
     if (timeDeltaMicros < slotTimeMicros) {
         delayMicroseconds(slotTimeMicros - timeDeltaMicros);
     }
     else {
+        // Print warning when slot time has been exceed
         sprintf(strOut, "[W][M5StickC_GamepadApp.cpp] loop(): Duration of loop greater than cycle time: %d microseconds.", timeDeltaMicros);
         Serial.println(strOut);
     }
-    
+
 }
