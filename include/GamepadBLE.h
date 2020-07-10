@@ -101,6 +101,41 @@ class GamepadBLE {
          */
         tGamepadReportStruct gamepadData_;
 
+        enum tAdvLib { NONE = 0, ESP_BLE = 1, ESP_IDF = 2 };
+
+        tAdvLib advLib_ = tAdvLib::NONE;
+
+        /**
+         * Defines advertisement data and scan response data using ESP BLE library structs
+         * and functions.
+         */
+        void setupAdvertisementDataBleLib();
+
+        /**
+         * Defines advertisement data and scan response data by providing raw data to the
+         * ESP BLE library functions.
+         */
+        void setupAdvertisementDataBleRaw(const std::string &deviceName);
+
+        /**
+         * BLE advertisement configuration parameters as required by the ESP-IDF BLE library.
+         * 
+         * See: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/bluetooth/esp_gap_ble.html#_CPPv420esp_ble_adv_params_t
+         */
+        esp_ble_adv_params_t advParamsIdf_;
+
+        /**
+         * Defines advertisement data and scan response data using ESP-IDF library structs
+         * and functions.
+         */
+        void setupAdvertisementDataEspIdf(const std::string &deviceName);
+
+        /**
+         * Starts advertising using the same library that has been used to configure the advertisement data.
+         */
+        void startAdvertising();
+
+
         class ConnectionEventCallback : public BLEServerCallbacks
         {
             public:
@@ -113,5 +148,8 @@ class GamepadBLE {
             private:
                 GamepadBLE* pGamepad_;
         };
+
+
+        static void gapEventHandler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 
 };
