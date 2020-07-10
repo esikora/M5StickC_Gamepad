@@ -142,12 +142,11 @@ void GamepadBLE::start(BLEServer* pServer, const tDeviceInfo &deviceInfo) {
     // Start the service
     pHIDdevice_->startServices();
 
-    // Register the custom Gap event handler of the gamepad class
-    BLEDevice::setCustomGapHandler(gapEventHandler);
-
     // Setup the BLE advertisement data for the HID gamepad device
-    setupAdvertisementDataEspIdf(deviceInfo.deviceName);
+    //setupAdvertisementDataEspIdf(deviceInfo.deviceName);
+    setupAdvertisementDataBleLib();
 
+    // Start advertising using the previously defined configuration data
     startAdvertising();
 
     // Debug output
@@ -185,7 +184,7 @@ void GamepadBLE::setupAdvertisementDataBleRaw(const std::string &deviceName)
     advData.setCompleteServices(pHIDdevice_->hidService()->getUUID());
 
     pAdvertising->setAdvertisementData(advData);
-    
+
     //esp_ble_gap_config_adv_data_raw( (uint8_t*) advData.getPayload().data(), advData.getPayload().length() );
 
     /*** Define scan response data as raw string ***/    
@@ -196,11 +195,14 @@ void GamepadBLE::setupAdvertisementDataBleRaw(const std::string &deviceName)
 
 void GamepadBLE::setupAdvertisementDataEspIdf(const std::string &deviceName)
 {
+    // Store the information that ESP-IDF library is used for advertisement
+    advLib_ = tAdvLib::ESP_IDF;
+
     // Create the semaphore that will be used for synchronization on BLE GAP events
     espBleGapEventSemaphore_ = xSemaphoreCreateBinary();
 
-    // Store the information that ESP-IDF library is used for advertisement
-    advLib_ = tAdvLib::ESP_IDF;
+    // Register the custom Gap event handler of the gamepad class
+    BLEDevice::setCustomGapHandler(gapEventHandler);
 
     /*** Define advertisement data using ESP-IDF library struct ***/
     esp_ble_adv_data_t   advDataIDF;
@@ -248,6 +250,9 @@ void GamepadBLE::setupAdvertisementDataEspIdf(const std::string &deviceName)
     // Synchronize on the event 'ESP_GAP_BLE_SCAN_RSP_DATA_SET_COMPLETE_EVT'
     xSemaphoreTake(espBleGapEventSemaphore_, portMAX_DELAY);
 
+    // Unregister the custom Gap event handler
+    BLEDevice::setCustomGapHandler(nullptr);
+
     /*** Set advertisement configuration parameters using ESP-IDF library struct ***/    
 	advParamsIdf_.adv_int_min       = 0x20;
 	advParamsIdf_.adv_int_max       = 0x40;
@@ -256,13 +261,6 @@ void GamepadBLE::setupAdvertisementDataEspIdf(const std::string &deviceName)
 	advParamsIdf_.channel_map       = ADV_CHNL_ALL;
 	advParamsIdf_.adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY;
 	advParamsIdf_.peer_addr_type    = BLE_ADDR_TYPE_PUBLIC;
-
-    /*** Start advertising using ESP-IDF library function ***/
-    esp_ble_gap_start_advertising(&advParamsIdf_);
-
-    // Synchronize on the event 'ESP_GAP_BLE_ADV_START_COMPLETE_EVT' (possibly unnecessary)
-    xSemaphoreTake(espBleGapEventSemaphore_, portMAX_DELAY);
-
 }
 
 void GamepadBLE::startAdvertising()
@@ -282,7 +280,12 @@ void GamepadBLE::startAdvertising()
         }
 
         case tAdvLib::ESP_IDF:
+            /*** Start advertising using ESP-IDF library function ***/
             esp_ble_gap_start_advertising(&advParamsIdf_);
+
+            // Synchronize on the event 'ESP_GAP_BLE_ADV_START_COMPLETE_EVT' (possibly unnecessary)
+            //xSemaphoreTake(espBleGapEventSemaphore_, portMAX_DELAY);
+
             break;
 
         default:
@@ -369,6 +372,8 @@ void GamepadBLE::gapEventHandler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_pa
 {
     /* Note: This function is called by the bluetooth task, not by the gamepad application task */
 
+    log_d("gapEventHandler [event no: %d]", (int)event);
+
     switch (event)
     {
         case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
@@ -388,7 +393,7 @@ void GamepadBLE::gapEventHandler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_pa
             break;
 
         case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
-            xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
+            //xSemaphoreGive(getInstance()->espBleGapEventSemaphore_);
             break;
 
         default:
