@@ -53,7 +53,7 @@ void M5StickC_GamepadIO::process()
     }
     else
     {
-        Serial.println("M5StickC_GamepadIO::process: Error reading joystick data via I2C.");
+        log_e("Error reading joystick data via I2C.");
 
         // Note: If reading is unsuccessful, the variables keep their previous values
     }

@@ -55,14 +55,6 @@ void M5StickC_PowerManagement::readData()
 
     powerStatus_ = M5.Axp.GetInputPowerStatus();
     powerModeChargeStatus_ = M5.Axp.GetBatteryChargingStatus();
-
-    // Debug output
-    /*char strOut[150];
-
-    sprintf(strOut, "VBat = %.3f V, PBat = %.3f mW, ICharge = %.3f mA, Coulomb = %.3f mAh, CoulombMax = %.3f mAh",
-        batVoltage_, batPower_, batChargeCurrent_, coulombData_, coulombCounterMax_);
-
-    Serial.println(strOut);*/
 }
 
 /**
@@ -87,9 +79,8 @@ void M5StickC_PowerManagement::computeBatteryCapacity()
                 
                 storeCoulombCounterMaxValue();
 
-                // Debug output
-                sprintf(strOut, "During charging, the coulomb counter reached a new max value: %f.3 mAh.", coulombCounterMax_);
-                Serial.println(strOut);
+                // Log output
+                log_i("During charging, the coulomb counter reached a new max value: %f.3 mAh.", coulombCounterMax_);
             }
         }
 
@@ -102,9 +93,8 @@ void M5StickC_PowerManagement::computeBatteryCapacity()
             {
                 coulombCounterMax_ = coulombData_;
 
-                // Debug output
-                sprintf(strOut, "Charging complete. Saving coulomb counter max value: %f.3 mAh.", coulombCounterMax_);
-                Serial.println(strOut);
+                // Log output
+                log_i("Charging complete. Saving coulomb counter max value: %f.3 mAh.", coulombCounterMax_);
 
                 storeCoulombCounterMaxValue();
             }
@@ -131,8 +121,7 @@ void M5StickC_PowerManagement::computeBatteryCapacity()
                 coulombData_ = 0;
 
                 // Debug output
-                sprintf(strOut, "Negative coulomb counter. Increased max value to %f.3.", coulombCounterMax_);
-                Serial.println(strOut);
+                log_i("Negative coulomb counter. Increased max value to %f.3.", coulombCounterMax_);
             }
         }
     }
@@ -152,9 +141,8 @@ void M5StickC_PowerManagement::computeBatteryCapacity()
             // Ajust the max value of the coulomb counter accordingly
             coulombCounterMax_ = coulombCounterMax_ - coulombData_;
 
-            // Debug output
-            sprintf(strOut, "Coulomb counter too large at low voltage (%f.3). Decreased max value to %f.3.", coulombData_, coulombCounterMax_);
-            Serial.println(strOut);
+            // Log output
+            log_i("Coulomb counter too large at low voltage (%f.3). Decreased max value to %f.3.", coulombData_, coulombCounterMax_);
 
             storeCoulombCounterMaxValue();
 
@@ -192,7 +180,6 @@ void M5StickC_PowerManagement::storeCoulombCounterMaxValue()
  */
 bool M5StickC_PowerManagement::retrieveCoulombCounterMaxValue()
 {
-    char strOut[150];
     uint8_t axpStorage[6];
 
     M5.Axp.Read6BytesStorage(axpStorage); // Default is: F0/0F/00/FF/00/00H
@@ -206,17 +193,18 @@ bool M5StickC_PowerManagement::retrieveCoulombCounterMaxValue()
     }
 
     // Debug output
-    Serial.print("Raw data from AXP192 Storage: ");
+    std::string hexStr;
+    char hexByteStr[4];
 
     for (int i = 0; i < sizeof(axpStorage); ++i)
     {
-        sprintf(strOut, "%02X ", axpStorage[i]);
-        Serial.print(strOut);
+        sprintf(hexByteStr, "%02X ", axpStorage[i]);
+        hexStr.append(hexByteStr);
     }
 
-    sprintf(strOut, "-> Float value: %.4f", f);
-    Serial.println(strOut);
+    log_d("Data from AXP192 Storage: %s (raw), %.4f (float)", hexStr, f);
 
+    // Validity flag
     bool valid = false;
 
     // Check whether last two bytes from AXP storage match the expected storage key
@@ -231,17 +219,14 @@ bool M5StickC_PowerManagement::retrieveCoulombCounterMaxValue()
             valid = true;
 
             // Debug output
-            sprintf(strOut, "Coulomb counter max value successfully restored to %.4f", coulombCounterMax_);
-            Serial.println(strOut);
+            log_i("Coulomb counter max value successfully restored to %.4f", coulombCounterMax_);
         }
         else {
-            sprintf(strOut, "Warning: value read from AXP storage is out of plausible range!");
-            Serial.println(strOut);
+            log_w("Warning: value read from AXP storage is out of plausible range!");
         }
     }
     else {
-        sprintf(strOut, "Warning: storage key read from AXP does not match expected key!");
-        Serial.println(strOut);
+        log_w( "Warning: storage key read from AXP does not match expected key!");
     }
 
     // @TODO: Compare max counter with value derived from battery voltage and adjust it if necessary

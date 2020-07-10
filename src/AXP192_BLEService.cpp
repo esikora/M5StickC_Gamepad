@@ -18,8 +18,7 @@ AXP192_BLEService::AXP192_BLEService()
 
 void AXP192_BLEService::start(BLEServer *pServer)
 {
-    Serial.println("[V][AXP192_BLEService.cpp] start(): >> start");
-    Serial.flush();
+    log_v(">>");
 
     powerService_ = pServer->createService(kPowerServiceUUID, 100); // Number of handles needs to be increased, default is 15
 
@@ -168,15 +167,11 @@ void AXP192_BLEService::start(BLEServer *pServer)
         acInAvailable_->addDescriptor(pBle2904);
     }
 
-    Serial.println("[V][AXP192_BLEService.cpp] start(): power service done");
-    Serial.flush();
+    log_v("Starting power service.");
 
     powerService_->start();
-    Serial.println("[V][AXP192_BLEService.cpp] start(): power service started");
-    Serial.flush();
 
-    Serial.println("[V][AXP192_BLEService.cpp] start(): << start");
-    Serial.flush();
+    log_v("<<");
 }
 
 /**

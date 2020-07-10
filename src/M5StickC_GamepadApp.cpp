@@ -121,9 +121,8 @@ uint32_t timeDeltaMaxInCycleMicros = 0;
 uint32_t timeDeltaMaxMicros = 0;
 
 
-// Buffer to store debug output for printing to Serial.
+// Buffer for storing string outputs
 char strOut[200];
-
 
 // BLE server object of this device
 BLEServer *pServer = nullptr;
@@ -168,6 +167,24 @@ void setup()
 }
 
 /**
+ * Prints the current RTC date and time (real time clock) into a char array.
+ * 
+ * @param str Buffer for storing the output.
+ */
+void rtcTimestampToStr(char* str)
+{
+    RTC_TimeTypeDef RTC_TimeStruct;
+    RTC_DateTypeDef RTC_DateStruct;
+
+    M5.Rtc.GetTime(&RTC_TimeStruct);
+    M5.Rtc.GetData(&RTC_DateStruct);
+    
+    sprintf(str, "%04d-%02d-%02d, %02d:%02d:%02d",
+        RTC_DateStruct.Year, RTC_DateStruct.Month, RTC_DateStruct.Date,
+        RTC_TimeStruct.Hours, RTC_TimeStruct.Minutes, RTC_TimeStruct.Seconds);
+}
+
+/**
  * Processes power management data.
  * Among other things determines the battery level of the gamepad.
  */
@@ -177,8 +194,11 @@ void processAxp()
     axp192PowMan.readAndProcessData();
     
     // Debug output
+    char rtcTimestampStr[40];
+    rtcTimestampToStr(rtcTimestampStr);
+
     axp192PowMan.printStatusToString(strOut);
-    Serial.println(strOut);
+    log_i("%s: %s", rtcTimestampStr, strOut);
 
     // Set battery level of gamepad
     uint8_t batLvlPerc = (uint8_t) axp192PowMan.getBatteryLevelPercent();
@@ -196,24 +216,6 @@ void processAxp()
     axp192Ble.setVBusPresent( axp192PowMan.isVBusPresent() );
     axp192Ble.setVBusAvailable( axp192PowMan.isVBusAvailable() );
     #endif
-}
-
-/**
- * Prints the current date and time from the RTC (real time clock) to Serial.
- */
-void printRtcTimestamp()
-{
-    RTC_TimeTypeDef RTC_TimeStruct;
-    RTC_DateTypeDef RTC_DateStruct;
-
-    M5.Rtc.GetTime(&RTC_TimeStruct);
-    M5.Rtc.GetData(&RTC_DateStruct);
-    
-    sprintf(strOut, "%04d-%02d-%02d, %02d:%02d:%02d: ",
-        RTC_DateStruct.Year, RTC_DateStruct.Month, RTC_DateStruct.Date,
-        RTC_TimeStruct.Hours, RTC_TimeStruct.Minutes, RTC_TimeStruct.Seconds);
-
-    Serial.print(strOut);
 }
 
 void processGamepadControls()
@@ -293,8 +295,7 @@ void loop()
     // Store start time of loop() to compute duration later on
     timeStartMicros = micros();
 
-    //Serial.println("[V][M5StickC_GamepadApp.cpp] loop(): >> loop");
-    //Serial.flush();
+    log_v(">>");
 
     // In the first slot of a cycle, reset the "max slot duration per cycle"
     if (curSlotNr == 0) {
@@ -325,7 +326,6 @@ void loop()
     // Do in slot 3 every 100 slots
     if (curSlotNr % 100 == 3)
     {
-        printRtcTimestamp();
         processAxp();
     }
 
@@ -339,10 +339,11 @@ void loop()
                 timeDeltaMaxInCycleMicros,
                 timeDeltaMaxMicros);
 
-        Serial.println(strOut);
+        log_i("%s", strOut);
     }
-    
-    
+
+    log_v("<<");
+        
     // Compute duration of loop
     timeEndMicros = micros();
     timeDeltaMicros = timeEndMicros - timeStartMicros;
@@ -362,18 +363,13 @@ void loop()
     // Increase slot number up to end of cycle
     curSlotNr = (curSlotNr + 1) % kNumSlots;
 
-
-    //Serial.println("[V][M5StickC_GamepadApp.cpp] loop(): << loop");
-    //Serial.flush();
-
     /* ----- Wait remaining time until next slot ----- */
     if (timeDeltaMicros < slotTimeMicros) {
         delayMicroseconds(slotTimeMicros - timeDeltaMicros);
     }
     else {
         // Print warning when slot time has been exceed
-        sprintf(strOut, "[W][M5StickC_GamepadApp.cpp] loop(): Duration of loop greater than cycle time: %d microseconds.", timeDeltaMicros);
-        Serial.println(strOut);
+        log_w("Duration of loop greater than cycle time: %d microseconds.", timeDeltaMicros);
     }
 
 }
