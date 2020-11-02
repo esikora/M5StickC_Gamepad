@@ -200,7 +200,7 @@ bool M5StickC_PowerManagement::retrieveCoulombCounterMaxValue()
         hexStr.append(hexByteStr);
     }
 
-    log_d("Data from AXP192 Storage: %s (raw), %.4f (float)", hexStr, f);
+    log_d("Data from AXP192 Storage: %s (raw), %.4f (float)", hexStr.c_str(), f);
 
     // Validity flag
     bool valid = false;

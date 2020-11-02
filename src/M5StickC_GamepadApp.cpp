@@ -164,6 +164,13 @@ void setup()
 
     // Yield and let other tasks initialize
     delay(200);
+
+    log_d("Total heap: %d", ESP.getHeapSize());
+    log_d("Free heap: %d", ESP.getFreeHeap());
+    log_d("Total PSRAM: %d", ESP.getPsramSize());
+    log_d("Free PSRAM: %d", ESP.getFreePsram());
+
+    log_d("IDF version: %s", ESP.getSdkVersion());
 }
 
 /**

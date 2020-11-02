@@ -131,6 +131,8 @@ void GamepadBLE::start(BLEServer* pServer, const tDeviceInfo &deviceInfo) {
     // Start the service
     pHIDdevice_->startServices();
 
+    log_d("Device name: %s", deviceInfo.deviceName.c_str());
+
     // Setup the BLE advertisement data for the HID gamepad device
     //setupAdvertisementDataEspIdf(deviceInfo.deviceName);
     setupAdvertisementDataBleLib();
@@ -150,7 +152,9 @@ void GamepadBLE::setupAdvertisementDataBleLib()
 
     /*** Define advertisement data and scan response data using BLE library functions ***/
     pAdvertising->setAppearance(HID_GAMEPAD);
-    pAdvertising->addServiceUUID(pHIDdevice_->hidService()->getUUID());
+    //pAdvertising->addServiceUUID(pHIDdevice_->hidService()->getUUID());
+    //pAdvertising->setMinPreferred(0x0);
+    //pAdvertising->setMaxPreferred(0x0);
 }
 
 void GamepadBLE::setupAdvertisementDataBleRaw(const std::string &deviceName)
