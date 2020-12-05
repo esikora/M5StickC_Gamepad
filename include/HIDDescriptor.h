@@ -224,7 +224,7 @@ typedef struct {
  */
 static const tDeviceInfo kGamepadDeviceInfoGeneric2 =
 {
-    "ESP32 Wireless Joystick",
+    "ESP32 Wireless Gamepad",
     0x01,
     0x02E5,
     0xABCD,
