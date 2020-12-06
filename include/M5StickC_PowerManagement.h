@@ -2,6 +2,7 @@
 
 /**
  * Helper class to use the functions of the M5StickC AXP192 power management unit.
+ * Its main functionality is to learn the battery capacity and compute the current battery level.
  * 
  * Content of the AXP192 power status register (0x00), see:
  * https://github.com/ContextQuickie/TTGO-T-Beam/wiki/Register-00H:-Power-Status-Register
@@ -22,11 +23,15 @@ class M5StickC_PowerManagement {
 
         static const float kCoulombThresholdNegative; // mAh
 
-        static const float kCoulombLowVoltage; // V
-
         static const float kCoulombLowVoltageMaxValue; // mAh
 
         static const uint8_t kAxp192StorageDefault[];
+
+        static const float kBatteryVoltageLow; // V
+
+        static const float kBatteryVoltageHigh; // V
+
+        static const float kBatteryChargeCurrentLow; // mA
 
         
 
@@ -47,14 +52,14 @@ class M5StickC_PowerManagement {
         void readData();
 
         /**
-         * Processes the data read from the AXP192 unit in order to determine the battery level.
+         * Processes the data read from the AXP192 unit in order to determine the battery capacity.
          * 
          * Needs to be called periodically, e.g. every 1 s, for the other functions of this class to work correctly.
          */
-        void computeBatteryLevel();
+        void computeBatteryCapacity();
 
         /**
-         * Calls readData and computeBatteryLevel.
+         * Calls readData and computeBatteryCapacity.
          */
         void readAndProcessData();
 
@@ -84,13 +89,34 @@ class M5StickC_PowerManagement {
         }
 
         /**
+         * Returns the battery current.
+         * batCurrent = batChargeCurrent - batDischargeCurrent
+         * 
+         * @return Battery current [mA].
+         */
+        inline float getBatCurrent()
+        {
+            return batCurrent_;
+        }
+
+        /**
          * Returns the battery charge current.
          * 
          * @return Battery charge current [mA].
          */
-        inline float getChargeCurrent()
+        inline float getBatChargeCurrent()
         {
             return batChargeCurrent_;
+        }
+
+        /**
+         * Returns the battery discharge current.
+         * 
+         * @return Battery discharge current [mA].
+         */
+        inline float getBatDischargeCurrent()
+        {
+            return batDischargeCurrent_;
         }
 
         /**
@@ -198,7 +224,18 @@ class M5StickC_PowerManagement {
          */
         inline float getBatteryLevelPercent()
         {
-            float batPerc = coulombData_ / coulombCounterMax_ * 100;
+            float batPerc = 0.0f;
+
+            if ( (coulombData_ > 0) && (coulombCounterMax_ > 0) ) {
+                if (coulombData_ > coulombCounterMax_)
+                {
+                    batPerc = 100.0f;
+                }
+                else
+                {
+                    batPerc = coulombData_ / coulombCounterMax_ * 100;
+                }
+            }
 
             return batPerc;
         }
@@ -233,13 +270,15 @@ class M5StickC_PowerManagement {
         // Maximum value of coulomb counter [mAh]
         float   coulombCounterMax_ = 0;
 
-        float 	batVoltage_;
-        float 	batPower_;
-        float 	batChargeCurrent_;
-        float 	coulombData_;
+        float 	batVoltage_             = 0.0f;
+        float 	batPower_               = 0.0f;
+        float   batCurrent_             = 0.0f;
+        float 	batChargeCurrent_       = 0.0f;
+        float   batDischargeCurrent_    = 0.0f;
+        float 	coulombData_            = 0.0f;
 
-        uint8_t powerStatus_;
-        uint8_t powerModeChargeStatus_;
+        uint8_t powerStatus_            = 0;
+        uint8_t powerModeChargeStatus_  = 0;
 
         /**
          * Writes a float value and a key into the 6 byte AXP192 storage register.

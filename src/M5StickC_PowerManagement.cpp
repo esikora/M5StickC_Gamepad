@@ -7,9 +7,13 @@ const float M5StickC_PowerManagement::kCoulombMax = 5000.0f; // mAh
 
 const float M5StickC_PowerManagement::kCoulombThresholdNegative = -0.5f; // mAh
 
-const float M5StickC_PowerManagement::kCoulombLowVoltage = 3.1f; // V
+const float M5StickC_PowerManagement::kBatteryVoltageLow = 3.2f; // V
 
-const float M5StickC_PowerManagement::kCoulombLowVoltageMaxValue = 2.5f; // mAh
+const float M5StickC_PowerManagement::kBatteryVoltageHigh = 4.14f; // V
+
+const float M5StickC_PowerManagement::kBatteryChargeCurrentLow = 20.0f;
+
+const float M5StickC_PowerManagement::kCoulombLowVoltageMaxValue = 0.9f; // mAh
 
 const uint8_t M5StickC_PowerManagement::kAxp192StorageDefault[] = { 0xF0, 0x0F, 0x00, 0xFF, 0x00, 0x00 };
 
@@ -42,81 +46,105 @@ void M5StickC_PowerManagement::readData()
 {
     batVoltage_ = M5.Axp.GetBatVoltage();
     batPower_ = M5.Axp.GetBatPower();
+    
+    batCurrent_ = M5.Axp.GetBatCurrent();
     batChargeCurrent_ = M5.Axp.GetBatChargeCurrent();
+    batDischargeCurrent_ = batCurrent_ - batChargeCurrent_;
 
     coulombData_ = M5.Axp.GetCoulombData();
 
     powerStatus_ = M5.Axp.GetInputPowerStatus();
     powerModeChargeStatus_ = M5.Axp.GetBatteryChargingStatus();
-
-    // Debug output
-    char strOut[150];
-
-    sprintf(strOut, "VBat = %.3f V, PBat = %.3f mW, ICharge = %.3f mA, Coulomb = %.3f mAh, CoulombMax = %.3f mAh",
-        batVoltage_, batPower_, batChargeCurrent_, coulombData_, coulombCounterMax_);
-
-    Serial.println(strOut);
 }
 
 /**
- * Processes the data read from the AXP192 unit in order to determine the battery level.
+ * Processes the data read from the AXP192 unit in order to determine the battery capacity.
  * 
  * Needs to be called periodically, e.g. every 1 s, for the other functions of this class to work correctly.
  */
-void M5StickC_PowerManagement::computeBatteryLevel()
+void M5StickC_PowerManagement::computeBatteryCapacity()
 {
-    char strOut[150];
-
-    // Has the coulomb counter reached a new maximum value?
-    if (coulombData_ > coulombCounterMax_)
+    // Is the device attached to a power source?
+    if (isVBusPresent())
     {
-        coulombCounterMax_ = coulombData_;
-        
-        storeCoulombCounterMaxValue();
+        // Is the device still charging?
+        if ( (batVoltage_ < kBatteryVoltageHigh) && (batChargeCurrent_ >= kBatteryChargeCurrentLow) )
+        {
+            // Has the coulomb counter reached a new maximum value during charging?
+            if (coulombData_ > coulombCounterMax_)
+            {
+                coulombCounterMax_ = coulombData_;
+                
+                storeCoulombCounterMaxValue();
 
-        // Debug output
-        sprintf(strOut, "Coulomb counter reached new maximum value of %f.3.", coulombCounterMax_);
-        Serial.println(strOut);
+                // Log output
+                log_i("During charging, the coulomb counter reached a new max value: %f.3 mAh.", coulombCounterMax_);
+            }
+        }
+
+        // Has the device completed charging?
+        if ( (batVoltage_ >= kBatteryVoltageHigh) && (batChargeCurrent_ < kBatteryChargeCurrentLow) )
+        {
+
+            // Coulomb counter will not get any higher. Hence store it as new max value.
+            if (coulombCounterMax_ > coulombData_)
+            {
+                coulombCounterMax_ = coulombData_;
+
+                // Log output
+                log_i("Charging complete. Saving coulomb counter max value: %f.3 mAh.", coulombCounterMax_);
+
+                storeCoulombCounterMaxValue();
+            }
+        } 
     }
+    else { // Device is not attached to a power source
 
-    /* If coulomb counter falls below zero:
-       - reset coulomb counter to zero
-       - increase the positive maximum value of the coulomb counter accordingly
-       Intention: Coulomb counter shall be a positive value */
-    if (coulombData_ < kCoulombThresholdNegative)
-    {
-        M5.Axp.ClearCoulombcounter();
-        
-        coulombCounterMax_ = coulombCounterMax_ - coulombData_;
-        
-        storeCoulombCounterMaxValue();
+        // Is the battery voltage within normal range, i.e. not low?
+        if (batVoltage_ >= kBatteryVoltageLow)
+        {
+            /* If coulomb counter falls below zero:
+                - reset coulomb counter to zero
+                - increase the positive maximum value of the coulomb counter accordingly
+                Intention: Coulomb counter shall be a positive value
+            */
+            if (coulombData_ < kCoulombThresholdNegative)
+            {
+                M5.Axp.ClearCoulombcounter();
+                
+                coulombCounterMax_ = coulombCounterMax_ - coulombData_;
+                
+                storeCoulombCounterMaxValue();
 
-        coulombData_ = 0;
+                coulombData_ = 0;
 
-        // Debug output
-        sprintf(strOut, "Negative coulomb counter. Increased max value to %f.3.", coulombCounterMax_);
-        Serial.println(strOut);
+                // Debug output
+                log_i("Negative coulomb counter. Increased max value to %f.3.", coulombCounterMax_);
+            }
+        }
     }
 
     /* Adapt the maximum value of the coulomb counter, when voltage drops to
        critical level and counter has got a high value */
 
     // Is the device approaching power-off due to low voltage?
-    if (batVoltage_ <= kCoulombLowVoltage)
+    if (batVoltage_ < kBatteryVoltageLow)
     {
         // At a low voltage the coulomb counter should be close to zero
         if (coulombData_ > kCoulombLowVoltageMaxValue)
         {
-            // Ajust the max value of the coulomb counter
+            // Set coulomb counter to zero
+            M5.Axp.ClearCoulombcounter();
+
+            // Ajust the max value of the coulomb counter accordingly
             coulombCounterMax_ = coulombCounterMax_ - coulombData_;
 
-            // Debug output
-            sprintf(strOut, "Coulomb counter too large at low voltage (%f.3). Decreased max value to %f.3.", coulombData_, coulombCounterMax_);
-            Serial.println(strOut);
+            // Log output
+            log_i("Coulomb counter too large at low voltage (%f.3). Decreased max value to %f.3.", coulombData_, coulombCounterMax_);
 
             storeCoulombCounterMaxValue();
 
-            // Set coulomb data to zero. As long as the M5StickC still runs, negative values will be reset to zero.
+            // Set coulomb data to zero.
             coulombData_ = 0;
         }
     }
@@ -124,12 +152,12 @@ void M5StickC_PowerManagement::computeBatteryLevel()
 }
 
 /**
- * Calls readData and computeBatteryLevel.
+ * Calls readData and computeBatteryCapacity.
  */
 void M5StickC_PowerManagement::readAndProcessData()
 {
     readData();
-    computeBatteryLevel();
+    computeBatteryCapacity();
 }
 
 /**
@@ -150,7 +178,6 @@ void M5StickC_PowerManagement::storeCoulombCounterMaxValue()
  */
 bool M5StickC_PowerManagement::retrieveCoulombCounterMaxValue()
 {
-    char strOut[150];
     uint8_t axpStorage[6];
 
     M5.Axp.Read6BytesStorage(axpStorage); // Default is: F0/0F/00/FF/00/00H
@@ -164,17 +191,18 @@ bool M5StickC_PowerManagement::retrieveCoulombCounterMaxValue()
     }
 
     // Debug output
-    Serial.print("Raw data from AXP192 Storage: ");
+    std::string hexStr;
+    char hexByteStr[4];
 
     for (int i = 0; i < sizeof(axpStorage); ++i)
     {
-        sprintf(strOut, "%02X ", axpStorage[i]);
-        Serial.print(strOut);
+        sprintf(hexByteStr, "%02X ", axpStorage[i]);
+        hexStr.append(hexByteStr);
     }
 
-    sprintf(strOut, "-> Float value: %.4f", f);
-    Serial.println(strOut);
+    log_d("Data from AXP192 Storage: %s (raw), %.4f (float)", hexStr.c_str(), f);
 
+    // Validity flag
     bool valid = false;
 
     // Check whether last two bytes from AXP storage match the expected storage key
@@ -189,17 +217,14 @@ bool M5StickC_PowerManagement::retrieveCoulombCounterMaxValue()
             valid = true;
 
             // Debug output
-            sprintf(strOut, "Coulomb counter max value successfully restored to %.4f", coulombCounterMax_);
-            Serial.println(strOut);
+            log_i("Coulomb counter max value successfully restored to %.4f", coulombCounterMax_);
         }
         else {
-            sprintf(strOut, "Warning: value read from AXP storage is out of plausible range!");
-            Serial.println(strOut);
+            log_w("Warning: value read from AXP storage is out of plausible range!");
         }
     }
     else {
-        sprintf(strOut, "Warning: storage key read from AXP does not match expected key!");
-        Serial.println(strOut);
+        log_w( "Warning: storage key read from AXP does not match expected key!");
     }
 
     // @TODO: Compare max counter with value derived from battery voltage and adjust it if necessary
@@ -228,8 +253,8 @@ void M5StickC_PowerManagement::restoreDefaultAxpStorage()
  */
 void M5StickC_PowerManagement::printStatusToString(char *strOut)
 {
-    sprintf(strOut, "VBat = %.3f V, PBat = %.3f mW, ICharge = %.3f mA, Coulomb = %.3f mAh, CoulombMax = %.3f mAh, vBusPresent = %d",
-    batVoltage_, batPower_, batChargeCurrent_, coulombData_, coulombCounterMax_, isVBusPresent());
+    sprintf(strOut, "vBat = %.3f V, pBat = %.3f mW, iBat = %.3f mA, iChrg = %.3f mA, iDischrg = %.3f mAh, clmb = %.3f mAh, clmbMax = %.3f mAh, vBusPres = %d",
+    batVoltage_, batPower_, batCurrent_, batChargeCurrent_, batDischargeCurrent_, coulombData_, coulombCounterMax_, isVBusPresent());
 }
 
 /**

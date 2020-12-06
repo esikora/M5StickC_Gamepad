@@ -2,12 +2,16 @@
 #include <HIDTypes.h>
 
 /**
- * HID report descriptor for a generic gamepad Controller.
- * 
+ * HID report map (HID descriptor) for a generic gamepad Controller.
  * Based on: https://github.com/lemmingDev/ESP32-BLE-Gamepad/blob/master/BleGamepad.cpp
  * 
+ * Service: Human Interface Device (UUID 0x1812)
+ * Characteristic: Report Map (UUID 0x2A4B)
+ * https://www.bluetooth.com/xml-viewer/?src=https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.report_map.xml
+ * 
+ * Field: Report Map Value
  */
-static const uint8_t kReportDescriptorGeneric2[] = {
+static const uint8_t kGamepadReportMapGeneric2[] = {
     USAGE_PAGE(1),       0x01, // USAGE_PAGE (Generic Desktop)
     USAGE(1),            0x05, // USAGE (Gamepad)
     COLLECTION(1),       0x01, // COLLECTION (Application)
@@ -62,12 +66,12 @@ static const uint8_t kReportDescriptorGeneric2[] = {
 };
 
 /**
- * Message size in bytes of the report 'Generic2'.
+ * Message size in bytes for the report ID 0x01 specified by the report map kReportDescriptorGeneric2.
  */
-static const uint8_t kMsgSizeReportGeneric2 = 13;
+static const uint8_t kGamepadReportSizeGeneric2 = 13;
 
 /**
- * Input report ID 0x01 struct for Generic HID over GATT controller.
+ * Report ID 0x01 struct for Generic HID over GATT controller.
  */
 #pragma pack(push, 1)
 typedef struct
@@ -100,5 +104,151 @@ typedef struct
 
     uint8_t hatSwitch1  :  4; // Hat switch, value = 1 to 8, Physical = (Value - 1) x 45 in degrees
     uint8_t hatSwitch2  :  4; // Hat switch, value = 1 to 8, Physical = (Value - 1) x 45 in degrees
-} StructGamepadInputGeneric2_t;
+} tGamepadReportStructGeneric2;
 #pragma pack(pop)
+
+
+/**
+ * Struct type definition for Bluetooth LE device information.
+ * Encompasses several Bluetooth characteristics.
+ */
+typedef struct {
+
+    /**
+     * Service: Generic Access (0x1800)
+     * Characteristic: Device Name (UUID 0x2A00)
+     * https://www.bluetooth.com/xml-viewer/?src=https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.gap.device_name.xml
+     *
+     * Field: Name
+     */
+    std::string deviceName;
+
+    /**
+     * Service: Device Information (UUID 0x180A)
+     * Characteristic: PnP ID (UUID 0x2A50)
+     * https://www.bluetooth.com/xml-viewer/?src=https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.pnp_id.xml
+     *
+     * Field: Vendor ID Source
+     *   1 = Bluetooth SIG assigned Company Identifier value from the Assigned Numbers document
+     *       https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers/
+     * 
+     *   2 = USB Implementer’s Forum assigned Vendor ID value
+     *       https://www.usb.org/developers --> Valid USB Vendor ID Numbers
+     */
+    uint8_t vendorIdSource;
+
+    /**
+     * Service: Device Information (UUID 0x180A)
+     * Characteristic: PnP ID (UUID 0x2A50)
+     * https://www.bluetooth.com/xml-viewer/?src=https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.pnp_id.xml
+     * 
+     * Field: Vendor ID
+     * Identifies the product vendor from the namespace in the Vendor ID Source.
+     */
+    uint16_t vendorId;
+
+    /**
+     * Service: Device Information (UUID 0x180A)
+     * Characteristic: PnP ID (UUID 0x2A50)
+     * https://www.bluetooth.com/xml-viewer/?src=https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.pnp_id.xml
+     * 
+     * Field: Product ID
+     * Manufacturer managed identifier for this product
+     */
+    uint16_t productId;
+
+    /**
+     * Service: Device Information (UUID 0x180A)
+     * Characteristic: PnP ID (UUID 0x2A50)
+     * https://www.bluetooth.com/xml-viewer/?src=https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.pnp_id.xml
+     * 
+     * Field: Product version
+     * Manufacturer managed version for this product
+     */
+    uint16_t productVersion;
+
+    /**
+     * Service: Device Information (UUID 0x180A)
+     * Characteristic: Manufacturer Name String (UUID 0x2A29)
+     * https://www.bluetooth.com/xml-viewer/?src=https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.manufacturer_name_string.xml
+     * 
+     * Field: Manufacturer Name
+     * The value of this characteristic is a UTF-8 string representing the name of the manufacturer of the device. 
+     */
+    std::string manufacturerNameString;
+
+    /**
+     * Service: Human Interface Device (UUID 0x1812) 
+     * Characteristic: HID Information (UUID 0x2A4A)
+     * https://www.bluetooth.com/xml-viewer/?src=https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.hid_information.xml
+     * 
+     * Field: bCountryCode
+     * Identifies which country the hardware is localized for. Most hardware is not localized and thus this value would be zero (0).
+     */
+    uint8_t country;
+
+    /**
+     * Service: Human Interface Device (UUID 0x1812) 
+     * Characteristic: HID Information (UUID 0x2A4A)
+     * https://www.bluetooth.com/xml-viewer/?src=https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Characteristics/org.bluetooth.characteristic.hid_information.xml
+     * 
+     * Field: Flags
+     * - Index 0: RemoteWake
+     * - Index 1: NormallyConnectable
+     */    
+    uint8_t flags;
+
+} tDeviceInfo;
+
+
+/* GATT Characteristic 'PNP ID':
+
+    Source: https://www.partsnotincluded.com/understanding-the-xbox-360-wired-controllers-usb-data/
+
+    1. Vendor ID Source: 0x02 = 'USB Implementer’s Forum assigned Vendor ID value'
+    2. Vendor ID: 0x045E = 'Microsoft Corporation'
+    3. Product ID: 0x02FD = 'XBOX ONE S Controller [Bluetooth]'
+    4. Product Version = 'xxx' (TBD)
+*/
+//pHIDdevice_->pnp(0x02, 0x045E, 0x02FD, 0x0903);
+
+/* GATT Characteristic 'HID information':
+         1. Country: 0x00 = not localized 
+         2. Flags (bitfield): 0x03 = 'bit0: capable of providing wake-up signal to a HID host' | 'bit1: normally connectable'
+    */    
+    //pHIDdevice_->hidInfo(0x00, 0x02);
+
+/**
+ * Device info for a gamepad based on:
+ * https://github.com/lemmingDev/ESP32-BLE-Gamepad/blob/master/BleGamepad.cpp
+ */
+static const tDeviceInfo kGamepadDeviceInfoGeneric2 =
+{
+    "ESP32 Wireless Gamepad",
+    0x01,
+    0x02E5,
+    0xABCD,
+    0x0110,
+    "DIY",
+    0x00,
+    0x01
+};
+
+/**
+ * Mappings of constants and structs to be applied for the specific gamepad device.
+ */
+
+// Device information for this Gamepad
+static const tDeviceInfo kGamepadDeviceInfo = kGamepadDeviceInfoGeneric2;
+
+// Report map value for this Gamepad
+static const uint8_t *pGamepadReportMap = kGamepadReportMapGeneric2;
+
+// Report map size
+static const uint16_t kGamepadReportMapSize = sizeof(kGamepadReportMapGeneric2);
+
+// Expected report size
+static const uint8_t kGamepadReportSize = kGamepadReportSizeGeneric2;
+
+// Struct type definition for the report value
+typedef tGamepadReportStructGeneric2 tGamepadReportStruct;
