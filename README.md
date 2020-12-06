@@ -21,7 +21,7 @@ Bluetooth low energy (BLE) gamepad based on an M5StickC (ESP32).
 
 ## Project Description
 
-...Will follow soon...
+A comprehensive description of this project is available at [hackster.io](https://www.hackster.io/esikora/wireless-gamepad-with-esp32-and-ble-9e069a).
 
 ## License
 
