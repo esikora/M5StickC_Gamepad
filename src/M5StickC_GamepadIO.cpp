@@ -1,3 +1,25 @@
+/**
+    M5StickC_GamepadApp:
+    This application has been developed to use an M5StickC device (ESP32)
+    as bluetooth gamepad input device. It reads a joystick position and
+    button status and provides these data via Bluetooth Low Energy (BLE)
+    using the Human Interface Device (HID) via GATT protocol.
+    Copyright (C) 2020 by Ernst Sikora
+    
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+    
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+    
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "M5StickC_GamepadIO.h"
 
 #include <M5StickC.h>
